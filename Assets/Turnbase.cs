@@ -71,11 +71,9 @@ namespace BoardGames
 
 
 	/// <summary>
-	/// Lưu lại lịch sử các <see cref="GameAction"/> được thực hiện khi người chơi chơi game và cho phép Undo/ Redo.<br/>
-	/// GameState chỉ được thay đổi thông qua Play/ Undo/ Redo.
+	/// Lưu lại lịch sử các nước đi và cho phép Undo/ Redo.<br/>
+	/// Trạng thái bàn chơi chỉ được thay đổi thông qua <see cref="Play(IMoveData)"/>, <see cref="Undo(int)"/> và <see cref="Redo(int)"/>
 	/// </summary>
-	/// <typeparam name="I">PlayerID</typeparam>
-	/// <typeparam name="D">Data: Nước đi</typeparam>
 	[DataContract]
 	public sealed class History
 	{
@@ -100,9 +98,9 @@ namespace BoardGames
 		private readonly List<IMoveData> recentActions = new List<IMoveData>(CAPACITY), undoneActions = new List<IMoveData>(CAPACITY);
 
 		/// <summary>
-		/// Số lượng nước đã đi (Play) hiện tại.
+		/// Số lượng nước đã đi (Play/Redo).
 		/// </summary>
-		public int count => recentActions.Count;
+		public int moveCount => recentActions.Count;
 
 		public IMoveData this[int index] => recentActions[index];
 
@@ -192,14 +190,9 @@ namespace BoardGames
 		protected void Awake()
 		{
 			instance = instance ? throw new Exception() : this;
-			if (!("TURNBASE_CONFIG".GetValue<object>() is Config))
-			{
-				Destroy(gameObject);
-				return;
-			}
-
+			Config config;
+			try { config = "TURNBASE_CONFIG".GetValue<Config>(); } catch { Destroy(gameObject); return; }
 			history = new History();
-			var config = "TURNBASE_CONFIG".GetValue<Config>();
 		}
 
 
@@ -216,7 +209,7 @@ namespace BoardGames
 		/// <summary>
 		/// Gửi yêu cầu cho tất cả người chơi khác (ngoại trừ người chơi đã gửi yêu cầu)
 		/// </summary>
-		/// <returns><see langword="true"/> nếu chấp nhận yêu cầu</returns>
+		/// <returns><see langword="true"/> nếu tất cả người chơi khác chấp nhận yêu cầu</returns>
 		public abstract UniTask<bool> Request(Request request);
 		/// <summary>
 		/// Thoát trò chơi/ đầu hàng<para/>
@@ -240,12 +233,8 @@ namespace BoardGames
 		#region Lịch sử
 		protected History history { get; private set; }
 		public int turn => history.turn;
-		public int actionCount => history.count;
-		public IMoveData this[int index]
-		{
-			[MethodImpl(MethodImplOptions.AggressiveInlining)]
-			get => history[index];
-		}
+		public int moveCount => history.moveCount;
+		public IMoveData this[int index] => history[index];
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public bool CanUndo(int playerID) => history.CanUndo(playerID);
@@ -260,7 +249,7 @@ namespace BoardGames
 	/// <summary>
 	/// Chỉ tồn tại khi chơi offline
 	/// </summary>
-	public abstract class AIBase : MonoBehaviour, IListener
+	public abstract class AIAgentBase : MonoBehaviour, IListener
 	{
 		public enum Level
 		{
@@ -278,7 +267,7 @@ namespace BoardGames
 		}
 
 
-		public static AIBase instance { get; private set; }
+		public static AIAgentBase instance { get; private set; }
 		[SerializeField] protected Level level;
 
 		protected void Awake()
@@ -338,9 +327,11 @@ namespace BoardGames
 		#endregion
 
 
+		#region Validations
 		private UniTask CheckTurnBegin() => throw new NotImplementedException();
 		private UniTask CheckTurnEnd() => throw new NotImplementedException();
 		private UniTask CheckPlayerMove(IMoveData data) => throw new NotImplementedException();
 		private UniTask CheckRequest(int playerID, Request request) => throw new NotImplementedException();
+		#endregion
 	}
 }

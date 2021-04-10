@@ -40,7 +40,8 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0",
-    "jillejr.newtonsoft.json-for-unity.converters": "1.1.0"
+    "jillejr.newtonsoft.json-for-unity.converters": "1.1.0",
+    "com.yasirkula.ingamedebugconsole": "1.4.4"
   },
   "scopedRegistries": [
     {
@@ -50,6 +51,7 @@
         "com.cysharp.unitask",
         "com.dbrizov.naughtyattributes",
         "com.openupm",
+        "com.yasirkula.ingamedebugconsole",
         "jillejr.newtonsoft.json-for-unity",
         "jillejr.newtonsoft.json-for-unity.converters"
       ]

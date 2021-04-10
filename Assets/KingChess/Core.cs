@@ -103,7 +103,7 @@ namespace BoardGames.KingChess
 		public Core((Color playerID, PieceName name)?[][] mailBox = null)
 		{
 			if (mailBox != null && (mailBox.Length != 8 || mailBox[0].Length != 8)) throw new Exception("mailBox phải là 8x8 !");
-			mailBox = mailBox ?? DEFAULT_MAILBOX;
+			mailBox ??= DEFAULT_MAILBOX;
 
 			#region Khởi tạo {bitboards}, {mailBox}, {rookHistory}
 			for (int x = 0; x < 8; ++x) this.mailBox[x] = new (Color playerID, PieceName name)?[8];
@@ -179,7 +179,7 @@ namespace BoardGames.KingChess
 		/// <param name="playerID">Màu của quân Vua đang kiểm tra.</param>
 		/// <param name="opponentKH">Lịch sử quân Vua của địch</param>
 		/// <param name="opponentRH">Lịch sử quân Xe của địch</param>
-		private bool KingIsChecked(Color playerID, MoveData? latestMoveData)
+		private bool KingIsChecked(Color playerID, MoveData latestMoveData)
 		{
 			ulong king = bitboards[playerID][PieceName.King];
 			var opponentColor = playerID.Opponent();
@@ -502,7 +502,7 @@ namespace BoardGames.KingChess
 		{
 			list.Clear();
 			var m = TurnManager.instance;
-			var latestMoveData = m.actionCount != 0 ? m[m.actionCount - 1] as MoveData : null;
+			var latestMoveData = m.moveCount != 0 ? m[m.moveCount - 1] as MoveData : null;
 
 
 			#region {index} != null : Chỉ tìm move của 1 quân cờ tại index
@@ -642,7 +642,7 @@ namespace BoardGames.KingChess
 		/// <summary>
 		/// Nhớ cập nhật <see cref="MoveData.promotedName"/>
 		/// </summary>
-		private MoveData NewMoveData(Color playerID, PieceName name, int from, int to, out bool pawnPromotion)
+		private MoveData NewMoveData(in Color playerID, in PieceName name, in int from, in int to, out bool pawnPromotion)
 		{
 			var m_to = to.ToMailBoxIndex();
 			var data = new MoveData()
@@ -687,7 +687,7 @@ namespace BoardGames.KingChess
 		}
 
 
-		public async UniTask<MoveData?> GenerateMoveData(Vector2Int from, Vector2Int to, CancellationToken token = default)
+		public async UniTask<MoveData> GenerateMoveData(Vector2Int from, Vector2Int to, CancellationToken token = default)
 		{
 			var (playerID, name) = mailBox[from.x][from.y].Value;
 			var data = NewMoveData(playerID, name, from.ToBitIndex(), to.ToBitIndex(), out bool pawnPromotion);
@@ -695,7 +695,7 @@ namespace BoardGames.KingChess
 		}
 
 
-		public void Move(MoveData data, in History.Mode mode)
+		public void Move(MoveData data, History.Mode mode)
 		{
 			bool undo = mode == History.Mode.Undo;
 			PseudoMove(data, undo);
@@ -765,7 +765,7 @@ namespace BoardGames.KingChess
 
 			#region Cập nhật State
 			var t = TurnManager.instance;
-			var latestMoveData = t.actionCount != 0 ? t[t.actionCount - 1] as MoveData : null;
+			var latestMoveData = t.moveCount != 0 ? t[t.moveCount - 1] as MoveData : null;
 
 
 			if (!undo)

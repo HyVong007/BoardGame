@@ -1,4 +1,5 @@
 ﻿using Cysharp.Threading.Tasks;
+using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -68,6 +69,8 @@ namespace BoardGames
 			while (true) foreach (var value in values) yield return value;
 		}
 
+
+		#region Converts
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static Vector3Int ToVector3Int(this in Vector2Int value) => new Vector3Int(value.x, value.y, 0);
 
@@ -80,24 +83,88 @@ namespace BoardGames
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static Vector3 ToVector3(this in Vector2Int value) => new Vector3(value.x, value.y);
 
+#if !DEBUG
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+#endif
+		public static Vector3Int ToVector3Int(this in Vector3 value) =>
+#if DEBUG
+				value.x < 0 || value.y < 0 || value.z < 0 ? throw new IndexOutOfRangeException($"value= {value} phải là tọa độ không âm !") :
+#endif
+			new Vector3Int((int)value.x, (int)value.y, (int)value.z);
+		#endregion
+
+
+		#region UniTask
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static bool isRunning(this in UniTask task) => task.Status == UniTaskStatus.Pending;
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static bool isRunning<T>(this in UniTask<T> task) => task.Status == UniTaskStatus.Pending;
+
+
 		/// <summary>
-		/// Bỏ qua <see cref="OperationCanceledException"/>
+		/// Bắt <see cref="Exception"/> ngoại trừ <see cref="OperationCanceledException"/><br/>
+		/// Không <see langword="await"/> <paramref name="task"/>, đảm bảo luôn kiểm tra được status của <paramref name="task"/>
 		/// </summary>
-		public static async void Forget(this UniTask task)
+		public static void Forget(this in UniTask task)
 		{
-			while (task.Status == UniTaskStatus.Pending) await UniTask.Yield();
-			if (task.Status == UniTaskStatus.Faulted) await task;
+			tasks.Add(task);
+			if (tasks.Count == 1) Forget();
+		}
+
+
+		private static readonly List<UniTask> tasks = new List<UniTask>(), tmp = new List<UniTask>();
+		private static async void Forget()
+		{
+			while (true)
+			{
+				tmp.Clear();
+				foreach (var task in tasks)
+					if (!task.isRunning())
+						if (task.Status == UniTaskStatus.Faulted) await task;
+						else tmp.Add(task);
+
+				foreach (var task in tmp) tasks.Remove(task);
+				if (tasks.Count == 0) break;
+				await UniTask.Yield();
+			}
 		}
 
 
 		/// <summary>
-		/// Bỏ qua <see cref="OperationCanceledException"/>
+		/// Bắt <see cref="Exception"/> ngoại trừ <see cref="OperationCanceledException"/><br/>
+		/// Không <see langword="await"/> <paramref name="task"/>, đảm bảo luôn kiểm tra được status của <paramref name="task"/>
 		/// </summary>
-		public static async void Forget<T>(this UniTask<T> task)
+		public static void Forget<T>(this in UniTask<T> task)
 		{
-			while (task.Status == UniTaskStatus.Pending) await UniTask.Yield();
-			if (task.Status == UniTaskStatus.Faulted) await task;
+			GenericTasks<T>.tasks.Add(task);
+			if (GenericTasks<T>.tasks.Count == 1) GenericTasks<T>.Forget();
 		}
+
+
+		private static class GenericTasks<T>
+		{
+			public static readonly List<UniTask<T>> tasks = new List<UniTask<T>>();
+			private static readonly List<UniTask<T>> tmp = new List<UniTask<T>>();
+
+
+			public static async void Forget()
+			{
+				while (true)
+				{
+					tmp.Clear();
+					foreach (var task in tasks)
+						if (!task.isRunning())
+							if (task.Status == UniTaskStatus.Faulted) await task;
+							else tmp.Add(task);
+
+					foreach (var task in tmp) tasks.Remove(task);
+					if (tasks.Count == 0) break;
+					await UniTask.Yield();
+				}
+			}
+		}
+		#endregion
 
 
 		#region Move
@@ -234,6 +301,13 @@ namespace BoardGames
 			//=> t is OfflineTurnManager ? (t as OfflineTurnManager).IsHumanPlayer(t.currentPlayerID)
 			//	: GamePlayer.Find(t.currentPlayerID).IsLocal();
 			=> throw new NotImplementedException();
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static string ToJson(this object obj) => JsonConvert.SerializeObject(obj);
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static T FromJson<T>(this string json) => JsonConvert.DeserializeObject<T>(json);
 	}
 
 
@@ -304,8 +378,9 @@ namespace BoardGames
 		public override int GetHashCode() => (xMin, yMin, xMax, yMax).GetHashCode();
 
 
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static bool operator ==(Rect left, Rect right) => left.Equals(right);
+		public static bool operator ==(Rect left, Rect right) =>
+			left.xMin == right.xMin && left.yMin == right.yMin
+			&& left.xMax == right.xMax && left.yMax == right.yMax;
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -362,8 +437,6 @@ namespace BoardGames
 		private ObjectPool() { }
 
 
-		/// <param name="anchor">Anchor để gắn các <see cref="T"/> object</param>
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public ObjectPool(T prefab, Transform freeAnchor = null, Transform usingAnchor = null)
 		{
 			this.prefab = prefab;
@@ -375,28 +448,28 @@ namespace BoardGames
 		/// <param name="active">Active gameObject ngay lập tức ?</param>
 		public T Get(Vector3 position = default, bool active = true)
 		{
-			T obj;
+			T item;
 			if (free.Count != 0)
 			{
-				obj = free[0];
+				item = free[0];
 				free.RemoveAt(0);
 			}
-			else obj = UnityEngine.Object.Instantiate(prefab);
+			else item = UnityEngine.Object.Instantiate(prefab);
 
-			obj.transform.parent = usingAnchor;
-			@using.Add(obj);
-			obj.transform.position = position;
-			obj.gameObject.SetActive(active);
-			return obj;
+			item.transform.parent = usingAnchor;
+			@using.Add(item);
+			item.transform.position = position;
+			item.gameObject.SetActive(active);
+			return item;
 		}
 
 
-		public void Recycle(T obj)
+		public void Recycle(T item)
 		{
-			obj.gameObject.SetActive(false);
-			obj.transform.parent = freeAnchor;
-			@using.Remove(obj);
-			free.Add(obj);
+			item.gameObject.SetActive(false);
+			item.transform.parent = freeAnchor;
+			@using.Remove(item);
+			free.Add(item);
 		}
 
 
@@ -404,25 +477,25 @@ namespace BoardGames
 		{
 			for (int i = 0; i < @using.Count; ++i)
 			{
-				var obj = @using[i];
-				obj.gameObject.SetActive(false);
-				obj.transform.parent = freeAnchor;
-				free.Add(obj);
+				var item = @using[i];
+				item.gameObject.SetActive(false);
+				item.transform.parent = freeAnchor;
+				free.Add(item);
 			}
 			@using.Clear();
 		}
 
 
-		public void Destroy(T obj)
+		public void DestroyGameObject(T item)
 		{
-			@using.Remove(obj);
-			UnityEngine.Object.Destroy(obj);
+			@using.Remove(item);
+			UnityEngine.Object.Destroy(item.gameObject);
 		}
 
 
-		public void Destroy()
+		public void DestroyGameObject()
 		{
-			foreach (var obj in @using) UnityEngine.Object.Destroy(obj);
+			foreach (var item in @using) UnityEngine.Object.Destroy(item.gameObject);
 			@using.Clear();
 		}
 

@@ -19,18 +19,15 @@ namespace BoardGames
 		public override void SetMaterialDirty() { }
 		public override void SetVerticesDirty() { }
 		protected override void OnPopulateMesh(VertexHelper vh) => vh.Clear();
-	}
 
 
 
-	namespace Editor
-	{
 #if UNITY_EDITOR
 		/// <summary>
 		/// Ẩn hết field, chỉ hiện tùy chọn raycast
 		/// </summary>
 		[CanEditMultipleObjects, CustomEditor(typeof(GraphicRaycastTarget), false)]
-		internal sealed class GraphicRaycastTargetEditor : GraphicEditor
+		private sealed class Editor : GraphicEditor
 		{
 			public override void OnInspectorGUI()
 			{

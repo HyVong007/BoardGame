@@ -178,7 +178,7 @@ namespace BoardGames.Gomoku
 				mailBox[data.index.x][data.index.y] = (Symbol)data.playerID;
 				--emptyCells;
 
-				#region Kiểm tra {data.symbol} có chiến thắng hay bàn cờ hòa ?
+				#region Kiểm tra {data.playerID} có chiến thắng hay bàn cờ hòa ?
 				var enemySymbol = data.playerID == (int)Symbol.O ? Symbol.X : Symbol.O;
 				var winLines = this.winLines as List<Vector3[]>;
 				winLines.Clear();

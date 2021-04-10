@@ -78,9 +78,6 @@ namespace BoardGames.GOChess
 		}
 
 
-		/// <summary>
-		/// Đảm bảo <paramref name="mailBox"/> hợp lệ trước khi truyền vào 
-		/// </summary>
 		public Core(Color?[][] mailBox) : this(new Vector2Int(mailBox.Length, mailBox[0].Length))
 		{
 			var index = new Vector2Int();
@@ -209,7 +206,7 @@ namespace BoardGames.GOChess
 		};
 
 
-		public bool CanMove(Color color, Vector2Int index)
+		public bool CanMove(in Color color, in Vector2Int index)
 		{
 			if (mailBox[index.x][index.y] != null) return false;
 
@@ -243,12 +240,12 @@ namespace BoardGames.GOChess
 			public int playerID { get; }
 			public readonly Vector2Int index;
 			internal readonly int emptyHole;
-			internal List<Land> deadEnemies;
+			internal readonly List<Land> deadEnemies;
 
 			/// <summary>
 			/// <c>[<see cref="Land"/>] == airHole của <see cref="Land"/></c>
 			/// </summary>
-			internal Dictionary<Land, int> enemies, allies;
+			internal readonly Dictionary<Land, int> enemies, allies;
 
 			/// <summary>
 			/// <c>[<see cref="Color"/>] == { [<see cref="Land"/>] == point}</c>
@@ -260,7 +257,7 @@ namespace BoardGames.GOChess
 			};
 
 
-			internal MoveData(Core core, Color color, Vector2Int index)
+			internal MoveData(Core core, in Color color, in Vector2Int index)
 			{
 				this.index = index;
 				playerID = (int)color;
@@ -309,7 +306,7 @@ namespace BoardGames.GOChess
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public MoveData GenerateMoveData(Color color, Vector2Int index) => new MoveData(this, color, index);
+		public MoveData GenerateMoveData(in Color color, in Vector2Int index) => new MoveData(this, color, index);
 
 
 		public event Action<Vector2Int> onRecyclePieceGUI;
@@ -493,7 +490,7 @@ namespace BoardGames.GOChess
 
 
 	/// <summary>
-	/// Định nghĩa cách lưu json cho <see cref="History{I, D}"/> vì <see cref="Core.MoveData"/> không thể lưu json 
+	/// Định nghĩa cách lưu json cho <see cref="History"/> vì <see cref="Core.MoveData"/> không thể lưu json 
 	/// </summary>
 	public sealed class HistoryJsonConverter : JsonConverter
 	{

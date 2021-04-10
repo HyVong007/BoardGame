@@ -57,7 +57,6 @@ namespace BoardGames.ChineseChess
 	public sealed class Core
 	{
 		#region Khai báo dữ liệu và khởi tạo
-		public static readonly Rect rect = new Rect(0, 0, 8, 9);
 		[DataMember] private readonly Piece?[][] mailBox = new Piece?[9][];
 		private static readonly Piece?[][] DEFAULT_MAILBOX = new Piece?[][]
 		{
@@ -102,7 +101,7 @@ namespace BoardGames.ChineseChess
 		public Core(Piece?[][] mailBox = null)
 		{
 			if (mailBox != null && (mailBox.Length != 9 || mailBox[0].Length != 10))
-				throw new Exception("mailBox phải là 9x10 !");
+				throw new ArgumentOutOfRangeException("mailBox phải là 9x10 !");
 			mailBox ??= DEFAULT_MAILBOX;
 			for (int x = 0; x < 9; ++x)
 			{
@@ -294,7 +293,7 @@ namespace BoardGames.ChineseChess
 		private static readonly List<Vector2Int> pseudoList = new List<Vector2Int>(90);
 
 
-		private Vector2Int[] FindPseudoLegalMoves(Color color, PieceName name, Vector2Int index)
+		private Vector2Int[] FindPseudoLegalMoves(in Color color, in PieceName name, in Vector2Int index)
 		{
 			var THIS_SIDE = SIDES[color];
 			var THIS_PALACE = PALACES[color];
@@ -319,7 +318,7 @@ namespace BoardGames.ChineseChess
 					{
 						x = index.x + CROSS_VECTORS[d].x; y = index.y + CROSS_VECTORS[d].y;
 						if (((!hiddenChessRule && THIS_PALACE.Contains(x, y))
-							|| (hiddenChessRule && rect.Contains(x, y)))
+							|| (hiddenChessRule && IsInsideBoard(x, y)))
 							&& mailBox[x][y]?.color != color) pseudoList.Add(new Vector2Int(x, y));
 					}
 					break;
@@ -332,12 +331,12 @@ namespace BoardGames.ChineseChess
 						var dir = CROSS_VECTORS[d];
 						x = index.x + dir.x; y = index.y + dir.y;
 						if ((!hiddenChessRule && !THIS_SIDE.Contains(x, y))
-							|| (hiddenChessRule && !rect.Contains(x, y))
+							|| (hiddenChessRule && !IsInsideBoard(x, y))
 							|| mailBox[x][y] != null) continue;
 
 						x += dir.x; y += dir.y;
 						if (((!hiddenChessRule && THIS_SIDE.Contains(x, y))
-							|| (hiddenChessRule && rect.Contains(x, y)))
+							|| (hiddenChessRule && IsInsideBoard(x, y)))
 							&& mailBox[x][y]?.color != color) pseudoList.Add(new Vector2Int(x, y));
 					}
 					break;
@@ -349,12 +348,12 @@ namespace BoardGames.ChineseChess
 					{
 						var (line, crosses) = HORSE_VECTORS[h];
 						x = index.x + line.x; y = index.y + line.y;
-						if (!rect.Contains(x, y) || mailBox[x][y] != null) continue;
+						if (!IsInsideBoard(x, y) || mailBox[x][y] != null) continue;
 
 						for (int c = 0; c < 2; ++c)
 						{
 							int cx = x + crosses[c].x, cy = y + crosses[c].y;
-							if (rect.Contains(cx, cy) && mailBox[cx][cy]?.color != color) pseudoList.Add(new Vector2Int(cx, cy));
+							if (IsInsideBoard(cx, cy) && mailBox[cx][cy]?.color != color) pseudoList.Add(new Vector2Int(cx, cy));
 						}
 					}
 					break;
@@ -366,7 +365,7 @@ namespace BoardGames.ChineseChess
 					{
 						var dir = LRUD_VECTORS[d];
 						(x, y) = (index.x, index.y);
-						while (rect.Contains(x += dir.x, y += dir.y))
+						while (IsInsideBoard(x += dir.x, y += dir.y))
 						{
 							var c = mailBox[x][y]?.color;
 							if (c != color) pseudoList.Add(new Vector2Int(x, y));
@@ -382,7 +381,7 @@ namespace BoardGames.ChineseChess
 					{
 						var dir = LRUD_VECTORS[d];
 						(x, y) = (index.x, index.y);
-						while (rect.Contains(x += dir.x, y += dir.y))
+						while (IsInsideBoard(x += dir.x, y += dir.y))
 						{
 							var c = mailBox[x][y]?.color;
 							if (c == null)
@@ -390,7 +389,7 @@ namespace BoardGames.ChineseChess
 								pseudoList.Add(new Vector2Int(x, y)); continue;
 							}
 
-							while (rect.Contains(x += dir.x, y += dir.y))
+							while (IsInsideBoard(x += dir.x, y += dir.y))
 							{
 								var c2 = mailBox[x][y]?.color;
 								if (c2 == null) continue;
@@ -408,12 +407,12 @@ namespace BoardGames.ChineseChess
 					#region Pawn
 					var forward = COLOR_FORWARD_VECTORS[color];
 					x = index.x + forward.x; y = index.y + forward.y;
-					if (rect.Contains(x, y) && mailBox[x][y]?.color != color) pseudoList.Add(new Vector2Int(x, y));
+					if (IsInsideBoard(x, y) && mailBox[x][y]?.color != color) pseudoList.Add(new Vector2Int(x, y));
 					if (THIS_SIDE.Contains(index)) break;
 					for (int d = 0; d < 2; ++d)
 					{
 						x = index.x + LRUD_VECTORS[d].x; y = index.y + LRUD_VECTORS[d].y;
-						if (rect.Contains(x, y) && mailBox[x][y]?.color != color) pseudoList.Add(new Vector2Int(x, y));
+						if (IsInsideBoard(x, y) && mailBox[x][y]?.color != color) pseudoList.Add(new Vector2Int(x, y));
 					}
 					break;
 					#endregion
@@ -426,7 +425,7 @@ namespace BoardGames.ChineseChess
 		#region FindLegalMoves
 		private static readonly List<Vector2Int> legalList = new List<Vector2Int>(90);
 
-		private Vector2Int[] FindLegalMoves(Color color, PieceName name, Vector2Int index)
+		private Vector2Int[] FindLegalMoves(in Color color, in PieceName name, in Vector2Int index)
 		{
 			var moves = FindPseudoLegalMoves(color, name, index);
 			if (moves.Length == 0) return Array.Empty<Vector2Int>();
@@ -444,7 +443,7 @@ namespace BoardGames.ChineseChess
 		}
 
 
-		public Vector2Int[] FindLegalMoves(int x, int y)
+		public Vector2Int[] FindLegalMoves(in int x, in int y)
 		{
 			var piece = mailBox[x][y].Value;
 			return FindLegalMoves(piece.color, !piece.hidden ? piece.name : DEFAULT_MAILBOX[x][y].Value.name, new Vector2Int(x, y));
@@ -554,6 +553,10 @@ namespace BoardGames.ChineseChess
 			}
 		}
 		#endregion
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static bool IsInsideBoard(in int x, in int y) => -1 < x && x < 9 && -1 < y && y < 10;
 	}
 
 
