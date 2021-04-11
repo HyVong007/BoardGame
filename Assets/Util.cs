@@ -1,4 +1,5 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using BoardGames.Databases;
+using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
 using System;
 using System.Collections;
@@ -48,7 +49,7 @@ namespace BoardGames
 		public static void Remove(this string key) => dict.Remove(key);
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static void Write(this string key, object value) => dict[key] = value;
+		public static void SetValue(this string key, object value) => dict[key] = value;
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static void ClearAllKeys() => dict.Clear();
@@ -83,14 +84,15 @@ namespace BoardGames
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static Vector3 ToVector3(this in Vector2Int value) => new Vector3(value.x, value.y);
 
+		
 #if !DEBUG
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-		public static Vector3Int ToVector3Int(this in Vector3 value) =>
+		public static Vector2Int ToVector2Int(this in Vector3 value) =>
 #if DEBUG
-				value.x < 0 || value.y < 0 || value.z < 0 ? throw new IndexOutOfRangeException($"value= {value} phải là tọa độ không âm !") :
+				value.x < 0 || value.y < 0 ? throw new IndexOutOfRangeException($"value= {value} phải là tọa độ không âm !") :
 #endif
-			new Vector3Int((int)value.x, (int)value.y, (int)value.z);
+			new Vector2Int((int)value.x, (int)value.y);
 		#endregion
 
 
@@ -273,34 +275,9 @@ namespace BoardGames
 		#endregion
 
 
-		#region Instantiate Addressables
-		/// <summary>
-		/// <paramref name="relativePath"/>: Ví dụ A/B/C (không cần Assets và .prefab)
-		/// </summary>
-		//[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		//public static async UniTask<T> Instantiate<T>(this string relativePath)
-		//	=> (await Addressables.InstantiateAsync($"Assets/{relativePath}.prefab")).GetComponent<T>();
-
-		///// <summary>
-		///// <paramref name="relativePath"/>: Ví dụ A/B/C (không cần Assets và .prefab)
-		///// </summary>
-		//[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		//public static async UniTask<T> Instantiate<T>(this string relativePath, Vector3 position, Quaternion rotation)
-		//	=> (await Addressables.InstantiateAsync($"Assets/{relativePath}.prefab", position, rotation)).GetComponent<T>();
-
-		///// <summary>
-		///// <paramref name="relativePath"/>: Ví dụ A/B/C (không cần Assets và .prefab)
-		///// </summary>
-		//[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		//public static async UniTask<T> Instantiate<T>(this string relativePath, Transform parent)
-		//	=> (await Addressables.InstantiateAsync($"Assets/{relativePath}.prefab", parent)).GetComponent<T>();
-		#endregion
-
-
 		public static bool CurrentPlayerIsLocalHuman(this TurnManager t)
-			//=> t is OfflineTurnManager ? (t as OfflineTurnManager).IsHumanPlayer(t.currentPlayerID)
-			//	: GamePlayer.Find(t.currentPlayerID).IsLocal();
-			=> throw new NotImplementedException();
+			=> t is OfflineTurnManager ? (t as OfflineTurnManager).IsHumanPlayer(t.currentPlayerID)
+				: GamePlayer.Find(t.currentPlayerID).user == User.local;
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]

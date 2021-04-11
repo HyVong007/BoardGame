@@ -1,11 +1,19 @@
-﻿using UnityEngine;
+﻿using NaughtyAttributes;
+using UnityEngine;
+using UnityEngine.Tilemaps;
 
 
 namespace BoardGames.Gomoku
 {
-	[RequireComponent(typeof(SpriteRenderer))]
-	public sealed class Piece : MonoBehaviour
+	[CreateAssetMenu(fileName = "New Piece", menuName = "Chess/Gomoku/Piece", order = 0)]
+	public sealed class Piece : TileBase
 	{
 		[field: SerializeField] public Symbol symbol { get; private set; }
+		[ShowAssetPreview]
+		[SerializeField] private Sprite sprite;
+
+
+		public override void GetTileData(Vector3Int position, ITilemap tilemap, ref TileData tileData)
+			=> tileData.sprite = sprite;
 	}
 }

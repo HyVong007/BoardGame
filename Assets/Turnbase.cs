@@ -46,16 +46,16 @@ namespace BoardGames
 	public interface IListener
 	{
 		UniTask OnTurnBegin();
-		UniTask OnTurnEnd();
-		UniTask OnPlayerMove(IMoveData data, History.Mode mode);
-		UniTask OnTurnTimeOver();
-		UniTask OnPlayerTimeOver(int playerID);
+		void OnTurnEnd();
+		UniTask OnPlayerMove(IMoveData moveData, History.Mode mode);
+		void OnTurnTimeOver();
+		void OnPlayerTimeOver(int playerID);
 		/// <summary>
 		/// Nhận được yêu cầu và đợi phản hồi. Người gửi yêu cầu sẽ không nhận yêu cầu<para/>
 		/// Có thể gửi yêu cầu bất cứ khi nào khi đang chơi game không cần đợi đến lượt mình
 		/// </summary>
 		/// <returns><see langword="true"/> nếu chấp nhận yêu cầu</returns>
-		UniTask<bool> OnRequestReceive(int playerID, Request request);
+		UniTask<bool> OnReceiveRequest(int playerID, Request request);
 		/// <summary>
 		/// Người chơi thoát ra.<para/>
 		/// Chỉ xảy ra (được gọi) khi <paramref name="playerID"/> thoát thì game còn lại &gt;= 2 người chơi
@@ -89,20 +89,20 @@ namespace BoardGames
 		public History(History history)
 		{
 			turn = history.turn;
-			recentActions.AddRange(history.recentActions);
-			undoneActions.AddRange(history.undoneActions);
+			recentMoves.AddRange(history.recentMoves);
+			undoneMoves.AddRange(history.undoneMoves);
 		}
 
 
 		[DataMember]
-		private readonly List<IMoveData> recentActions = new List<IMoveData>(CAPACITY), undoneActions = new List<IMoveData>(CAPACITY);
+		private readonly List<IMoveData> recentMoves = new List<IMoveData>(CAPACITY), undoneMoves = new List<IMoveData>(CAPACITY);
 
 		/// <summary>
 		/// Số lượng nước đã đi (Play/Redo).
 		/// </summary>
-		public int moveCount => recentActions.Count;
+		public int moveCount => recentMoves.Count;
 
-		public IMoveData this[int index] => recentActions[index];
+		public IMoveData this[int index] => recentMoves[index];
 
 		[DataMember]
 		public int turn { get; private set; }
@@ -117,17 +117,17 @@ namespace BoardGames
 
 		public void Play(IMoveData data)
 		{
-			undoneActions.Clear();
-			if (recentActions.Count == CAPACITY) recentActions.RemoveAt(0);
+			undoneMoves.Clear();
+			if (recentMoves.Count == CAPACITY) recentMoves.RemoveAt(0);
 			++turn;
-			recentActions.Add(data);
+			recentMoves.Add(data);
 			execute(data, Mode.Play);
 		}
 
 
 		public bool CanUndo(int playerID)
 		{
-			for (int i = recentActions.Count - 1; i >= 0; --i) if (recentActions[i].playerID == playerID) return true;
+			for (int i = recentMoves.Count - 1; i >= 0; --i) if (recentMoves[i].playerID == playerID) return true;
 			return false;
 		}
 
@@ -137,19 +137,19 @@ namespace BoardGames
 			int tmp;
 			do
 			{
-				var action = recentActions[recentActions.Count - 1];
-				recentActions.RemoveAt(recentActions.Count - 1);
-				undoneActions.Add(action);
+				var move = recentMoves[recentMoves.Count - 1];
+				recentMoves.RemoveAt(recentMoves.Count - 1);
+				undoneMoves.Add(move);
 				--turn;
-				execute(action, Mode.Undo);
-				tmp = action.playerID;
+				execute(move, Mode.Undo);
+				tmp = move.playerID;
 			} while (tmp != playerID);
 		}
 
 
 		public bool CanRedo(int playerID)
 		{
-			for (int i = undoneActions.Count - 1; i >= 0; --i) if (undoneActions[i].playerID == playerID) return true;
+			for (int i = undoneMoves.Count - 1; i >= 0; --i) if (undoneMoves[i].playerID == playerID) return true;
 			return false;
 		}
 
@@ -159,12 +159,12 @@ namespace BoardGames
 			int tmp;
 			do
 			{
-				var action = undoneActions[undoneActions.Count - 1];
-				undoneActions.RemoveAt(undoneActions.Count - 1);
-				recentActions.Add(action);
+				var move = undoneMoves[undoneMoves.Count - 1];
+				undoneMoves.RemoveAt(undoneMoves.Count - 1);
+				recentMoves.Add(move);
 				++turn;
-				execute(action, Mode.Redo);
-				tmp = action.playerID;
+				execute(move, Mode.Redo);
+				tmp = move.playerID;
 			} while (tmp != playerID);
 		}
 	}
@@ -198,7 +198,7 @@ namespace BoardGames
 
 		protected abstract UniTask BeginTurn();
 		public Func<bool> IsGameOver;
-		protected abstract UniTask FinishTurn();
+		protected abstract void FinishTurn();
 		public abstract int currentPlayerID { get; }
 		/// <summary>
 		/// Đi 1 nước, nếu không có <paramref name="data"/> thì bỏ lượt, đồng thời có thể kết thúc lượt ngay sau khi đi.
@@ -210,7 +210,7 @@ namespace BoardGames
 		/// Gửi yêu cầu cho tất cả người chơi khác (ngoại trừ người chơi đã gửi yêu cầu)
 		/// </summary>
 		/// <returns><see langword="true"/> nếu tất cả người chơi khác chấp nhận yêu cầu</returns>
-		public abstract UniTask<bool> Request(Request request);
+		public abstract UniTask<bool> SendRequest(Request request);
 		/// <summary>
 		/// Thoát trò chơi/ đầu hàng<para/>
 		/// Nếu chỉ còn lại 1 người chơi thì trò chơi sẽ kết thúc ngay lập tức
@@ -249,7 +249,7 @@ namespace BoardGames
 	/// <summary>
 	/// Chỉ tồn tại khi chơi offline
 	/// </summary>
-	public abstract class AIAgentBase : MonoBehaviour, IListener
+	public abstract class AIAgent : MonoBehaviour, IListener
 	{
 		public enum Level
 		{
@@ -258,17 +258,12 @@ namespace BoardGames
 
 		public class Config
 		{
-			public readonly Level level;
-
-			public Config(Level level)
-			{
-				this.level = level;
-			}
+			public Level level;
 		}
 
 
-		public static AIAgentBase instance { get; private set; }
-		[SerializeField] protected Level level;
+		public static AIAgent instance { get; private set; }
+		protected Level level;
 
 		protected void Awake()
 		{
@@ -290,15 +285,15 @@ namespace BoardGames
 		public abstract void OnGameFinish();
 		public abstract UniTask OnPlayerMove(IMoveData data, History.Mode mode);
 		public abstract UniTask OnTurnBegin();
-		public abstract UniTask OnTurnEnd();
+		public abstract void OnTurnEnd();
 		#endregion
 
 
 		#region Not supported
-		public UniTask OnTurnTimeOver() => throw new NotSupportedException();
-		public UniTask OnPlayerTimeOver(int playerID) => throw new NotSupportedException();
+		public void OnTurnTimeOver() => throw new NotSupportedException();
+		public void OnPlayerTimeOver(int playerID) => throw new NotSupportedException();
 		public void OnPlayerQuit(int playerID) => throw new NotSupportedException();
-		public UniTask<bool> OnRequestReceive(int playerID, Request request) => throw new NotSupportedException();
+		public UniTask<bool> OnReceiveRequest(int playerID, Request request) => throw new NotSupportedException();
 		#endregion
 	}
 

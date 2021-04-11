@@ -21,12 +21,12 @@ namespace BoardGames.KingChess
 			throw new System.NotImplementedException();
 		}
 
-		public UniTask OnPlayerTimeOver(int playerID)
+		public void OnPlayerTimeOver(int playerID)
 		{
 			throw new System.NotImplementedException();
 		}
 
-		public UniTask<bool> OnRequestReceive(int playerID, Request request)
+		public UniTask<bool> OnReceiveRequest(int playerID, Request request)
 		{
 			throw new System.NotImplementedException();
 		}
@@ -36,12 +36,12 @@ namespace BoardGames.KingChess
 			throw new System.NotImplementedException();
 		}
 
-		public UniTask OnTurnEnd()
+		public void OnTurnEnd()
 		{
 			throw new System.NotImplementedException();
 		}
 
-		public UniTask OnTurnTimeOver()
+		public void OnTurnTimeOver()
 		{
 			throw new System.NotImplementedException();
 		}

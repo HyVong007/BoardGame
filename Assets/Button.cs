@@ -357,13 +357,16 @@ namespace BoardGames
 #endif
 						) return;
 
-				graphic ??= GetComponent<Graphic>();
-				graphic.raycastTarget = value;
-				graphic.color = (
 #if UNITY_EDITOR
 				editorBaking =
 #endif
-					_interactable = value) ? activeColor : disabledColor;
+					_interactable = value;
+
+				enabled = value;
+				graphic ??= GetComponent<Graphic>();
+				if (!graphic) return;
+				graphic.raycastTarget = value;
+				graphic.color = value ? activeColor : disabledColor;
 			}
 		}
 
