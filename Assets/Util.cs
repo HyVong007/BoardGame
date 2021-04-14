@@ -277,7 +277,7 @@ namespace BoardGames
 
 		public static bool CurrentPlayerIsLocalHuman(this TurnManager t)
 			=> t is OfflineTurnManager ? (t as OfflineTurnManager).IsHumanPlayer(t.currentPlayerID)
-				: GamePlayer.Find(t.currentPlayerID).user == User.local;
+				: TablePlayer.Find(t.currentPlayerID).user == User.local;
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]

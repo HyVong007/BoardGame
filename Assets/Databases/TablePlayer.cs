@@ -4,7 +4,7 @@ using System;
 
 namespace BoardGames.Databases
 {
-	public sealed class GamePlayer
+	public sealed class TablePlayer
 	{
 		public int id { get; set; }
 
@@ -13,9 +13,9 @@ namespace BoardGames.Databases
 		public Table table { get; set; }
 
 
-		public static GamePlayer local { get; private set; }
+		public static TablePlayer local { get; private set; }
 
 
-		public static GamePlayer Find(int playerID) => throw new NotImplementedException();
+		public static TablePlayer Find(int playerID) => throw new NotImplementedException();
 	}
 }

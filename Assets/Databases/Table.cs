@@ -22,9 +22,9 @@ namespace BoardGames.Databases
 
 		public int chair { get; set; }
 
-		public IReadOnlyList<GamePlayer> players { get; set; }
+		public IReadOnlyList<TablePlayer> players { get; set; }
 
-		public GamePlayer host { get; set; }
+		public TablePlayer host { get; set; }
 
 		public int money { get; set; }
 

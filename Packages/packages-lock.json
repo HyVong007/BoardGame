@@ -14,6 +14,12 @@
       "dependencies": {},
       "url": "https://package.openupm.com"
     },
+    "com.photonengine.pun2": {
+      "version": "file:Photon PUN2 FREE",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.rotaryheart.serialized_dictionary_lite": {
       "version": "file:C:/Users/Tam/Downloads/Compressed/serialized-dictionary-lite-master",
       "depth": 0,
@@ -21,11 +27,11 @@
       "dependencies": {}
     },
     "com.unity.2d.animation": {
-      "version": "5.0.4",
+      "version": "6.0.1",
       "depth": 0,
       "source": "registry",
       "dependencies": {
-        "com.unity.2d.common": "4.0.3",
+        "com.unity.2d.common": "5.0.0",
         "com.unity.mathematics": "1.1.0",
         "com.unity.2d.sprite": "1.0.0",
         "com.unity.modules.animation": "1.0.0",
@@ -34,7 +40,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.2d.common": {
-      "version": "4.0.3",
+      "version": "5.0.0",
       "depth": 1,
       "source": "registry",
       "dependencies": {
@@ -106,7 +112,7 @@
       }
     },
     "com.yasirkula.ingamedebugconsole": {
-      "version": "1.4.5",
+      "version": "1.4.8",
       "depth": 0,
       "source": "registry",
       "dependencies": {},

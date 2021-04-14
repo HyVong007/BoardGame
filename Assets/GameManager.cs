@@ -157,9 +157,9 @@ namespace BoardGames
 				};
 				tables.Add(table);
 
-				var list = new List<GamePlayer>();
+				var list = new List<TablePlayer>();
 				for (int i = 0; i < 8; ++i)
-					list.Add(new GamePlayer()
+					list.Add(new TablePlayer()
 					{
 						table = table,
 						user = new User() { sex = (User.Sex)(i % 2) }

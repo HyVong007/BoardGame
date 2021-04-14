@@ -21,12 +21,12 @@ namespace BoardGames
 
 		[SerializeField] private GameObject _locker;
 		public bool hasPassword { set => _locker.SetActive(value); }
-		[SerializeField] private Button _button;
-		public Button button => _button;
+		[field: SerializeField]
+		public Button button { get; private set; }
 
 
 		/// <summary>
-		/// [số lượng ghế/player] = {tọa độ ghế/player}
+		/// [số lượng ghế] = {tọa độ ghế}
 		/// </summary>
 		private static readonly IReadOnlyDictionary<int, int[]> count_indexs = new Dictionary<int, int[]>
 		{
@@ -55,14 +55,13 @@ namespace BoardGames
 		[SerializeField] private SerializableDictionaryBase<User.Sex, Sprite> sexSprites;
 		public void SetPlayers(User.Sex[] sexes = null)
 		{
-			foreach (var player in players) player.gameObject.SetActive(false);
+			foreach (var player in players) player.sprite = null;
 			if (sexes == null) return;
 			int i = 0;
 			foreach (int index in count_indexs[sexes.Length])
 			{
 				var player = players[index];
 				player.sprite = sexSprites[sexes[i++]];
-				player.gameObject.SetActive(true);
 			}
 		}
 
