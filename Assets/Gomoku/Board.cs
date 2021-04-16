@@ -7,7 +7,7 @@ using UnityEngine.Tilemaps;
 
 namespace BoardGames.Gomoku
 {
-	public sealed class Board : MonoBehaviour, IListener
+	public sealed class Board : MonoBehaviour, ITurnListener
 	{
 		public sealed class Config
 		{
@@ -69,7 +69,7 @@ namespace BoardGames.Gomoku
 
 
 		#region Listen
-		public async UniTask OnTurnBegin()
+		public void OnTurnBegin()
 		{
 			button.interactable = TurnManager.instance.CurrentPlayerIsLocalHuman();
 		}
@@ -96,7 +96,7 @@ namespace BoardGames.Gomoku
 
 
 		[SerializeField] private ObjectPool<LineRenderer> linePool;
-		public void OnGameFinish()
+		public void OnGameOver()
 		{
 			if (core.state != Core.State.Draw)
 			{

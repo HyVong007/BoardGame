@@ -84,7 +84,7 @@ namespace BoardGames
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static Vector3 ToVector3(this in Vector2Int value) => new Vector3(value.x, value.y);
 
-		
+
 #if !DEBUG
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
@@ -93,6 +93,18 @@ namespace BoardGames
 				value.x < 0 || value.y < 0 ? throw new IndexOutOfRangeException($"value= {value} phải là tọa độ không âm !") :
 #endif
 			new Vector2Int((int)value.x, (int)value.y);
+
+		/// <summary>
+		/// z = 0
+		/// </summary>
+#if !DEBUG
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+#endif
+		public static Vector3Int ToVector3Int(this in Vector3 value) =>
+#if DEBUG
+				value.x < 0 || value.y < 0 ? throw new IndexOutOfRangeException($"value= {value} phải là tọa độ không âm !") :
+#endif
+			new Vector3Int((int)value.x, (int)value.y, 0);
 		#endregion
 
 
@@ -285,6 +297,23 @@ namespace BoardGames
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static T FromJson<T>(this string json) => JsonConvert.DeserializeObject<T>(json);
+
+
+		private static ushort customTypeCode;
+		private static readonly object lock_CustomTypeCode = new object();
+		public static byte NextCustomTypeCode()
+		{
+			byte result;
+			lock (lock_CustomTypeCode)
+			{
+				if (customTypeCode > byte.MaxValue) throw new InvalidOperationException("Không thể đăng ký thêm Custom type !");
+				result = (byte)customTypeCode;
+				while (++customTypeCode <= byte.MaxValue &&
+					(customTypeCode == 'W' || customTypeCode == 'V' || customTypeCode == 'Q' || customTypeCode == 'P')) ;
+			}
+
+			return result;
+		}
 	}
 
 

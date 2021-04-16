@@ -4,9 +4,9 @@ using UnityEngine;
 
 namespace BoardGames.KingChess
 {
-	public sealed class Board : MonoBehaviour, IListener
+	public sealed class Board : MonoBehaviour, ITurnListener
 	{
-		public void OnGameFinish()
+		public void OnGameOver()
 		{
 			throw new System.NotImplementedException();
 		}
@@ -31,7 +31,7 @@ namespace BoardGames.KingChess
 			throw new System.NotImplementedException();
 		}
 
-		public UniTask OnTurnBegin()
+		public void OnTurnBegin()
 		{
 			throw new System.NotImplementedException();
 		}

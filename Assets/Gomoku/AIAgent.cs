@@ -31,7 +31,7 @@ namespace BoardGames.Gomoku
 
 
 		#region Listen
-		public async override UniTask OnTurnBegin()
+		public async override void OnTurnBegin()
 		{
 #if UNITY_EDITOR
 			try
@@ -67,7 +67,7 @@ namespace BoardGames.Gomoku
 		}
 
 
-		public override void OnGameFinish()
+		public override void OnGameOver()
 		{
 			Destroy(gameObject);
 		}

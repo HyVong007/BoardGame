@@ -1,6 +1,9 @@
-﻿using Newtonsoft.Json;
+﻿using ExitGames.Client.Photon;
+using Newtonsoft.Json;
+using Photon.Pun;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using UnityEngine;
@@ -68,17 +71,21 @@ namespace BoardGames.GOChess
 		public Rect rect { get; private set; }
 
 
-		public Core(Vector2Int size)
+		private static Core instance;
+		public Core(Vector2Int size, Action<Vector3Int, Color> drawPieceGUI, Action<Vector3Int> clearPieceGUI)
 		{
 			if (size.x < 2 || size.y < 2) throw new ArgumentOutOfRangeException($"Size phải >= (2, 2). size= {size}");
 			if (size.x * size.y > 10_000) throw new OutOfMemoryException($"Size quá lớn. size= {size}");
+			instance = this;
 			mailBox = new Piece[size.x][];
 			for (int x = 0; x < size.x; ++x) mailBox[x] = new Piece[size.y];
 			rect = new Rect(0, 0, size.x - 1, size.y - 1);
+			this.drawPieceGUI = drawPieceGUI;
+			this.clearPieceGUI = clearPieceGUI;
 		}
 
 
-		public Core(Color?[][] mailBox) : this(new Vector2Int(mailBox.Length, mailBox[0].Length))
+		public Core(Color?[][] mailBox, Action<Vector3Int, Color> drawPieceGUI, Action<Vector3Int> clearPieceGUI) : this(new Vector2Int(mailBox.Length, mailBox[0].Length), drawPieceGUI, clearPieceGUI)
 		{
 			var index = new Vector2Int();
 			for (index.x = 0; index.x < rect.width; ++index.x)
@@ -88,7 +95,7 @@ namespace BoardGames.GOChess
 		}
 
 
-		public Core(Core core) : this(new Vector2Int(core.rect.width, core.rect.height))
+		public Core(Core core, Action<Vector3Int, Color> drawPieceGUI, Action<Vector3Int> clearPieceGUI) : this(new Vector2Int(core.rect.width, core.rect.height), drawPieceGUI, clearPieceGUI)
 		{
 			if (core.state != null) throw new InvalidOperationException("Không thể copy bàn cờ đã kết thúc !");
 
@@ -305,13 +312,43 @@ namespace BoardGames.GOChess
 		}
 
 
+		static Core()
+		{
+			object @lock = new object();
+			PhotonPeer.RegisterType(typeof(MoveData), Util.NextCustomTypeCode(),
+				obj =>
+				{
+					lock (@lock)
+					{
+						var data = obj as MoveData;
+						using var stream = new MemoryStream();
+						using var writer = new BinaryWriter(stream);
+						writer.Write(data.playerID);
+						writer.Write(data.index.x);
+						writer.Write(data.index.y);
+						writer.Flush();
+						return stream.ToArray();
+					}
+				},
+				array =>
+				{
+					lock (@lock)
+					{
+						using var stream = new MemoryStream(array);
+						using var reader = new BinaryReader(stream);
+						return new MoveData(instance, (Color)reader.ReadInt32(), new Vector2Int(reader.ReadInt32(), reader.ReadInt32()));
+					}
+				});
+		}
+
+
+
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public MoveData GenerateMoveData(in Color color, in Vector2Int index) => new MoveData(this, color, index);
 
 
-		public event Action<Vector2Int> onRecyclePieceGUI;
-		public event Action<Vector2Int, Color> onGetPieceGUI;
-
+		private Action<Vector3Int, Color> drawPieceGUI;
+		private Action<Vector3Int> clearPieceGUI;
 		public void Move(MoveData data, History.Mode mode)
 		{
 			pieceCounts[Color.White] = pieceCounts[Color.Black] = -1;
@@ -351,7 +388,7 @@ namespace BoardGames.GOChess
 					{
 						var index = enemy.indexes[i];
 						mailBox[index.x][index.y] = null;
-						onRecyclePieceGUI?.Invoke(index);
+						clearPieceGUI(index.ToVector3Int());
 						for (int d = 0, __x, __y; d < 4; ++d)
 						{
 							__x = index.x + DIRECTIONS[d].x; __y = index.y + DIRECTIONS[d].y;
@@ -363,7 +400,7 @@ namespace BoardGames.GOChess
 				}
 				#endregion
 
-				onGetPieceGUI?.Invoke(data.index, (Color)data.playerID);
+				drawPieceGUI(data.index.ToVector3Int(), (Color)data.playerID);
 				#endregion
 			}
 			else
@@ -387,11 +424,11 @@ namespace BoardGames.GOChess
 					{
 						var index = enemy.indexes[i];
 						(mailBox[index.x][index.y] = new Piece(enemyColor)).land = enemy;
-						onGetPieceGUI?.Invoke(index, enemyColor);
+						drawPieceGUI(index.ToVector3Int(), enemyColor);
 					}
 				}
 
-				onRecyclePieceGUI?.Invoke(data.index);
+				clearPieceGUI(data.index.ToVector3Int());
 				#endregion
 			}
 		}

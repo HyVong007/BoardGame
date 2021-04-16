@@ -1,6 +1,8 @@
-﻿using Newtonsoft.Json;
+﻿using ExitGames.Client.Photon;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using UnityEngine;
@@ -94,14 +96,17 @@ namespace BoardGames.ChineseChess
 		[DataMember] private readonly bool hiddenChessRule;
 
 
+		private static Core instance;
 		[JsonConstructor]
-		private Core() { }
+		private Core() { instance = this; }
 
 
 		public Core(Piece?[][] mailBox = null)
 		{
 			if (mailBox != null && (mailBox.Length != 9 || mailBox[0].Length != 10))
 				throw new ArgumentOutOfRangeException("mailBox phải là 9x10 !");
+
+			instance = this;
 			mailBox ??= DEFAULT_MAILBOX;
 			for (int x = 0; x < 9; ++x)
 			{
@@ -461,7 +466,7 @@ namespace BoardGames.ChineseChess
 			[DataMember] public readonly Piece? capturedPiece;
 
 
-			internal MoveData(Piece piece, Vector2Int from, Vector2Int to, Piece? capturedPiece)
+			internal MoveData(in Piece piece, in Vector2Int from, in Vector2Int to, in Piece? capturedPiece)
 			{
 				this.piece = piece;
 				this.from = from;
@@ -474,8 +479,39 @@ namespace BoardGames.ChineseChess
 		}
 
 
+		static Core()
+		{
+			object @lock = new object();
+			PhotonPeer.RegisterType(typeof(MoveData), Util.NextCustomTypeCode(),
+				obj =>
+				{
+					lock (@lock)
+					{
+						var data = obj as MoveData;
+						using var stream = new MemoryStream();
+						using var writer = new BinaryWriter(stream);
+						writer.Write(data.from.x);
+						writer.Write(data.from.y);
+						writer.Write(data.to.x);
+						writer.Write(data.to.y);
+						writer.Flush();
+						return stream.ToArray();
+					}
+				},
+				array =>
+				{
+					lock (@lock)
+					{
+						using var stream = new MemoryStream(array);
+						using var reader = new BinaryReader(stream);
+						return instance.GenerateMoveData(new Vector2Int(reader.ReadInt32(), reader.ReadInt32()), new Vector2Int(reader.ReadInt32(), reader.ReadInt32()));
+					}
+				});
+		}
+
+
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public MoveData GenerateMoveData(Vector2Int from, Vector2Int to) =>
+		public MoveData GenerateMoveData(in Vector2Int from, in Vector2Int to) =>
 			 new MoveData(mailBox[from.x][from.y].Value, from, to, mailBox[to.x][to.y]);
 
 

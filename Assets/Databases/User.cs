@@ -20,6 +20,6 @@ namespace BoardGames.Databases
 
 
 
-		public static User local;
+		public static User local { get; set; }
 	}
 }

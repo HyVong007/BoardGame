@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NaughtyAttributes;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
@@ -17,7 +18,7 @@ namespace BoardGames.ChineseChess
 		private SpriteRenderer spriteRenderer;
 
 
-		[SerializeField] private Sprite hiddenSprite;
+		[ShowAssetPreview] [SerializeField] private Sprite hiddenSprite;
 		private bool _hidden;
 		/// <summary>
 		/// Nếu <see langword="true"/> là úp
@@ -40,7 +41,7 @@ namespace BoardGames.ChineseChess
 		}
 
 
-		[SerializeField] private Sprite symbolSprite;
+		[ShowAssetPreview] [SerializeField] private Sprite symbolSprite;
 		private Sprite normalSprite;
 		private static readonly List<PieceGUI> pieces = new List<PieceGUI>();
 

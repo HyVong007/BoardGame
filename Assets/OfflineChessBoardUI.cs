@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace BoardGames
 {
-	public sealed class OfflineChessBoardUI : MonoBehaviour, IListener
+	public sealed class OfflineChessBoardUI : MonoBehaviour, ITurnListener
 	{
 		private void Awake()
 		{
@@ -21,7 +21,7 @@ namespace BoardGames
 
 
 		#region Listener
-		public void OnGameFinish()
+		public void OnGameOver()
 		{
 		}
 
@@ -42,7 +42,7 @@ namespace BoardGames
 			return true;
 		}
 
-		public async UniTask OnTurnBegin()
+		public async void OnTurnBegin()
 		{
 		}
 

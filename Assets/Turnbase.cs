@@ -1,4 +1,5 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using BoardGames.Databases;
+using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -15,7 +16,7 @@ namespace BoardGames
 
 
 
-	public enum Request
+	public enum Request : byte
 	{
 		/// <summary>
 		/// Cầu hòa
@@ -43,9 +44,9 @@ namespace BoardGames
 
 
 
-	public interface IListener
+	public interface ITurnListener
 	{
-		UniTask OnTurnBegin();
+		void OnTurnBegin();
 		void OnTurnEnd();
 		UniTask OnPlayerMove(IMoveData moveData, History.Mode mode);
 		void OnTurnTimeOver();
@@ -57,7 +58,7 @@ namespace BoardGames
 		/// <returns><see langword="true"/> nếu chấp nhận yêu cầu</returns>
 		UniTask<bool> OnReceiveRequest(int playerID, Request request);
 		/// <summary>
-		/// Người chơi thoát ra.<para/>
+		/// Người chơi thoát khỏi bàn chơi (<see cref="Table"/>).<para/>
 		/// Chỉ xảy ra (được gọi) khi <paramref name="playerID"/> thoát thì game còn lại &gt;= 2 người chơi
 		/// </summary>
 		/// <param name="playerID">Người chơi mới thoát</param>
@@ -65,7 +66,7 @@ namespace BoardGames
 		/// <summary>
 		/// Game kết thúc vì trạng thái game kết thúc hoặc chỉ còn lại 1 người chơi
 		/// </summary>
-		void OnGameFinish();
+		void OnGameOver();
 	}
 
 
@@ -179,9 +180,9 @@ namespace BoardGames
 
 
 		public static TurnManager instance { get; private set; }
-		protected readonly IReadOnlyList<IListener> listeners = new List<IListener>();
+		protected readonly IReadOnlyList<ITurnListener> listeners = new List<ITurnListener>();
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public void AddListener(IListener listener) => (instance.listeners as List<IListener>).Add(listener);
+		public void AddListener(ITurnListener listener) => (instance.listeners as List<ITurnListener>).Add(listener);
 
 
 		/// <summary>
@@ -196,7 +197,7 @@ namespace BoardGames
 		}
 
 
-		protected abstract UniTask BeginTurn();
+		protected abstract void BeginTurn();
 		public Func<bool> IsGameOver;
 		protected abstract void FinishTurn();
 		public abstract int currentPlayerID { get; }
@@ -249,7 +250,7 @@ namespace BoardGames
 	/// <summary>
 	/// Chỉ tồn tại khi chơi offline
 	/// </summary>
-	public abstract class AIAgent : MonoBehaviour, IListener
+	public abstract class AIAgent : MonoBehaviour, ITurnListener
 	{
 		public enum Level
 		{
@@ -282,9 +283,9 @@ namespace BoardGames
 
 
 		#region Listen
-		public abstract void OnGameFinish();
+		public abstract void OnGameOver();
 		public abstract UniTask OnPlayerMove(IMoveData data, History.Mode mode);
-		public abstract UniTask OnTurnBegin();
+		public abstract void OnTurnBegin();
 		public abstract void OnTurnEnd();
 		#endregion
 

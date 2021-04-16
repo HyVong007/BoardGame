@@ -13,9 +13,13 @@ namespace BoardGames.Databases
 		public Table table { get; set; }
 
 
-		public static TablePlayer local { get; private set; }
+		public static TablePlayer local { get; set; }
 
 
-		public static TablePlayer Find(int playerID) => throw new NotImplementedException();
+		public static TablePlayer Find(int playerID)
+		{
+			// test
+			return local;
+		}
 	}
 }

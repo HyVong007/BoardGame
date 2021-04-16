@@ -23,9 +23,7 @@ namespace BoardGames
 		public bool IsHumanPlayer(int playerID) => isHumanPlayer[playerID];
 		[SerializeField] private AIAgent aiPrefab;
 
-		/// <summary>
-		/// gameObject có thể bị Destroy
-		/// </summary>
+
 		private async new void Awake()
 		{
 			base.Awake();
@@ -48,7 +46,7 @@ namespace BoardGames
 			#endregion
 
 			await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate);
-			await BeginTurn();
+			BeginTurn();
 		}
 
 
@@ -60,7 +58,7 @@ namespace BoardGames
 		}
 
 
-		protected async override UniTask BeginTurn()
+		protected override void BeginTurn()
 		{
 #if UNITY_EDITOR
 			try
@@ -71,7 +69,7 @@ namespace BoardGames
 			catch { return; }
 #endif
 			playerIDGenerator.MoveNext();
-			foreach (var listener in listeners) await listener.OnTurnBegin();
+			foreach (var listener in listeners) listener.OnTurnBegin();
 			cacheElapsedTurnTime = 0;
 			countTime = true;
 		}
@@ -83,7 +81,7 @@ namespace BoardGames
 			foreach (var listener in listeners) listener.OnTurnEnd();
 			if (IsGameOver())
 			{
-				foreach (var listener in listeners) listener.OnGameFinish();
+				foreach (var listener in listeners) listener.OnGameOver();
 				Destroy(gameObject);
 			}
 			else UniTask.Yield(PlayerLoopTiming.Update, default).ContinueWith(BeginTurn).Forget();
@@ -107,7 +105,7 @@ namespace BoardGames
 		public override void Quit()
 		{
 			countTime = false;
-			foreach (var listener in listeners) listener.OnGameFinish();
+			foreach (var listener in listeners) listener.OnGameOver();
 			Destroy(gameObject);
 		}
 
@@ -117,7 +115,7 @@ namespace BoardGames
 			switch (request)
 			{
 				case Request.DRAW:
-					foreach (var listener in listeners) listener.OnGameFinish();
+					foreach (var listener in listeners) listener.OnGameOver();
 					Destroy(gameObject);
 					break;
 

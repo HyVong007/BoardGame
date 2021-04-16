@@ -1,6 +1,9 @@
-﻿using Newtonsoft.Json;
+﻿using ExitGames.Client.Photon;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using UnityEngine;
@@ -154,8 +157,39 @@ namespace BoardGames.Gomoku
 			}
 
 
-			public override string ToString() => $"({playerID}, {index})";
+			public override string ToString() => $"({(Symbol)playerID}, {index})";
 		}
+
+
+		static Core()
+		{
+			object @lock = new object();
+			PhotonPeer.RegisterType(typeof(MoveData), Util.NextCustomTypeCode(),
+				obj =>
+				{
+					lock (@lock)
+					{
+						var data = obj as MoveData;
+						using var stream = new MemoryStream();
+						using var writer = new BinaryWriter(stream);
+						writer.Write(data.playerID);
+						writer.Write(data.index.x);
+						writer.Write(data.index.y);
+						writer.Flush();
+						return stream.ToArray();
+					}
+				},
+				array =>
+				{
+					lock (@lock)
+					{
+						using var stream = new MemoryStream(array);
+						using var reader = new BinaryReader(stream);
+						return new MoveData((Symbol)reader.ReadInt32(), new Vector2Int(reader.ReadInt32(), reader.ReadInt32()));
+					}
+				});
+		}
+
 
 		/// <summary>
 		/// Vector Phương = { Ngang, Dọc, Chéo Thuận, Chéo Nghịch}
