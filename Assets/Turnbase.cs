@@ -297,37 +297,4 @@ namespace BoardGames
 		public UniTask<bool> OnReceiveRequest(int playerID, Request request) => throw new NotSupportedException();
 		#endregion
 	}
-
-
-
-	public sealed class Server : ITime
-	{
-		private readonly History history;
-		private readonly IEnumerator<int> playerIDGenerator;
-
-
-		public Server() => throw new NotImplementedException();
-
-		public int currentPlayerID => playerIDGenerator.Current;
-
-
-		#region Network Time
-		public float elapsedTurnTime => throw new NotImplementedException();
-		public float remainTurnTime => maxTurnTime - elapsedTurnTime;
-		public float ElapsedPlayerTime(int playerID) => throw new NotImplementedException();
-		public float RemainPlayerTime(int playerID) => maxPlayerTimes[playerID] - ElapsedPlayerTime(playerID);
-
-		private float turnStartTime, maxTurnTime;
-		private readonly Dictionary<int, float> playerStartTimes = new Dictionary<int, float>();
-		private readonly Dictionary<int, float> maxPlayerTimes = new Dictionary<int, float>();
-		#endregion
-
-
-		#region Validations
-		private UniTask CheckTurnBegin() => throw new NotImplementedException();
-		private UniTask CheckTurnEnd() => throw new NotImplementedException();
-		private UniTask CheckPlayerMove(IMoveData data) => throw new NotImplementedException();
-		private UniTask CheckRequest(int playerID, Request request) => throw new NotImplementedException();
-		#endregion
-	}
 }

@@ -1,7 +1,9 @@
 ﻿using Cysharp.Threading.Tasks;
+using ExitGames.Client.Photon;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Threading;
@@ -10,14 +12,14 @@ using UnityEngine;
 
 namespace BoardGames.KingChess
 {
-	public enum PieceName
+	public enum PieceName : byte
 	{
 		Pawn = 0, Rook = 1, Bishop = 2, Knight = 3, Queen = 4, King = 5
 	}
 
 
 
-	public enum Color
+	public enum Color : byte
 	{
 		White = 0, Black = 1
 	}
@@ -603,9 +605,8 @@ namespace BoardGames.KingChess
 
 			public enum Castling
 			{
-				None, Near, Far
+				None = 0, Near = 1, Far = 2
 			}
-
 			/// <summary>
 			/// Trạng thái nhập Thành<para/>
 			/// Luôn di chuyển Vua đầu tiên và Vua di chuyển gây ra Nhập Thành
@@ -617,6 +618,93 @@ namespace BoardGames.KingChess
 					$"enpassantCapturedIndex= {enpassantCapturedIndex?.ToMailBoxIndex()}, promotedName= {promotedName}, " +
 					$"capturedRookHistory= {capturedRookHistory}, castling= {castling}";
 		}
+
+
+		static Core()
+		{
+			object @lock = new object();
+			PhotonPeer.RegisterType(typeof(MoveData), Util.NextCustomTypeCode(),
+				obj =>
+				{
+					lock (@lock)
+					{
+						var data = obj as MoveData;
+						using var stream = new MemoryStream();
+						using var writer = new BinaryWriter(stream);
+
+						// playerID
+						writer.Write((byte)data.playerID);
+
+						// from, to
+						writer.Write((byte)data.from);
+						writer.Write((byte)data.to);
+
+						// name
+						writer.Write((byte)data.name);
+
+						// capturedName
+						writer.Write(data.capturedName != null);
+						if (data.capturedName != null) writer.Write((byte)data.capturedName.Value);
+
+						if (data.capturedName == PieceName.Rook)
+						{
+							// capturedRookHistory
+							writer.Write(data.capturedRookHistory.moved);
+							writer.Write(data.capturedRookHistory.count);
+						}
+
+						if (data.name == PieceName.Pawn)
+							if (data.capturedName == PieceName.Pawn)
+							{
+								// enpassantCapturedIndex
+								writer.Write(data.enpassantCapturedIndex != null);
+								if (data.enpassantCapturedIndex != null)
+									writer.Write((byte)data.enpassantCapturedIndex.Value);
+							}
+							else
+							{
+								// promotedName
+								writer.Write(data.promotedName != null);
+								if (data.promotedName != null) writer.Write((byte)data.promotedName.Value);
+							}
+						else if (data.name == PieceName.King)
+							// castling
+							writer.Write((byte)data.castling);
+
+						return stream.ToArray();
+					}
+				},
+				array =>
+				{
+					lock (@lock)
+					{
+						using var stream = new MemoryStream(array);
+						using var reader = new BinaryReader(stream);
+
+						var data = new MoveData
+						{
+							playerID = reader.ReadByte(),
+							from = reader.ReadByte(),
+							to = reader.ReadByte(),
+							name = (PieceName)reader.ReadByte(),
+							capturedName = reader.ReadBoolean() ? (PieceName?)reader.ReadByte() : null
+						};
+
+						data.capturedRookHistory = data.capturedName == PieceName.Rook ?
+							(moved: reader.ReadBoolean(), count: reader.ReadInt32()) :
+							(moved: false, count: -1);
+
+						if (data.name == PieceName.Pawn)
+							if (data.capturedName == PieceName.Pawn) data.enpassantCapturedIndex = reader.ReadBoolean() ? (int?)reader.ReadByte() : null;
+							else data.promotedName = reader.ReadBoolean() ? (PieceName?)reader.ReadByte() : null;
+						else if (data.name == PieceName.King) data.castling = (MoveData.Castling)reader.ReadByte();
+
+						return data;
+					}
+				});
+		}
+
+
 
 		/// <summary>
 		/// Constant data: Khi nhập thành Rook di chuyển từ "from" tới "to"

@@ -69,3 +69,43 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# ==================================  GAME SERVER PROJECT  ============================
+
+/GameServer/*.swp
+/GameServer/*.*~
+/GameServer/project.lock.json
+/GameServer/.DS_Store
+/GameServer/*.pyc
+/GameServer/nupkg/
+
+# Visual Studio Code
+/GameServer/.vscode
+
+# Rider
+/GameServer/.idea
+
+# User-specific files
+/GameServer/*.suo
+/GameServer/*.user
+/GameServer/*.userosscache
+/GameServer/*.sln.docstates
+
+# Build results
+/GameServer/[Dd]ebug/
+/GameServer/[Dd]ebugPublic/
+/GameServer/[Rr]elease/
+/GameServer/[Rr]eleases/
+/GameServer/x64/
+/GameServer/x86/
+/GameServer/build/
+/GameServer/bld/
+/GameServer/[Bb]in/
+/GameServer/[Oo]bj/
+/GameServer/[Oo]ut/
+/GameServer/msbuild.log
+/GameServer/msbuild.err
+/GameServer/msbuild.wrn
+
+# Visual Studio 2015
+/GameServer/.vs/

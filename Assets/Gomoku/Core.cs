@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace BoardGames.Gomoku
 {
-	public enum Symbol
+	public enum Symbol : byte
 	{
 		O = 0, X = 1
 	}
@@ -55,7 +55,7 @@ namespace BoardGames.Gomoku
 
 		public Core(Vector2Int size)
 		{
-			if (size.x * size.y > 10_000) throw new OutOfMemoryException($"Size quá lớn. size= {size}");
+			if (size.x > 100 || size.y > 100) throw new OutOfMemoryException($"Size quá lớn. size= {size}");
 			mailBox = new Symbol?[size.x][];
 			for (int x = 0; x < size.x; ++x) mailBox[x] = new Symbol?[size.y];
 			rect = new Rect(0, 0, size.x - 1, size.y - 1);
@@ -172,9 +172,9 @@ namespace BoardGames.Gomoku
 						var data = obj as MoveData;
 						using var stream = new MemoryStream();
 						using var writer = new BinaryWriter(stream);
-						writer.Write(data.playerID);
-						writer.Write(data.index.x);
-						writer.Write(data.index.y);
+						writer.Write((byte)data.playerID);
+						writer.Write((byte)data.index.x);
+						writer.Write((byte)data.index.y);
 						writer.Flush();
 						return stream.ToArray();
 					}
@@ -185,7 +185,7 @@ namespace BoardGames.Gomoku
 					{
 						using var stream = new MemoryStream(array);
 						using var reader = new BinaryReader(stream);
-						return new MoveData((Symbol)reader.ReadInt32(), new Vector2Int(reader.ReadInt32(), reader.ReadInt32()));
+						return new MoveData((Symbol)reader.ReadByte(), new Vector2Int(reader.ReadByte(), reader.ReadByte()));
 					}
 				});
 		}

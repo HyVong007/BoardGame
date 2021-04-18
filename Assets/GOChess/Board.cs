@@ -26,7 +26,8 @@ namespace BoardGames.GOChess
 		{
 			instance = instance ? throw new Exception() : this;
 			var config = "BOARD_CONFIG".GetValue<Config>();
-			core = config.mailBox != null ? new Core(config.mailBox, DrawPieceGUI, ClearPieceGUI) : new Core(config.size, DrawPieceGUI, ClearPieceGUI);
+			Core.main = core = config.mailBox != null ? new Core(config.mailBox, DrawPieceGUI, ClearPieceGUI)
+				: new Core(config.size, DrawPieceGUI, ClearPieceGUI);
 			var rect = core.rect;
 			backgroundMap.size = gridMap.size = new Vector3Int(rect.width - 1, rect.height - 1, 0);
 			pieceMap.size = new Vector3Int(rect.width, rect.height, 0);
@@ -38,6 +39,9 @@ namespace BoardGames.GOChess
 			button.click += OnPlayerClick;
 			Camera.main.transform.position = new Vector3(rect.width / 2f, rect.height / 2f, -10);
 		}
+
+
+		private void OnDisable() => Core.main = null;
 
 
 		private void Start()
@@ -55,7 +59,7 @@ namespace BoardGames.GOChess
 			if (!core.CanMove((Color)t.currentPlayerID, index)) return;
 
 			button.interactable = false;
-			await t.Play(core.GenerateMoveData((Color)t.currentPlayerID, index), true);
+			await t.Play(new Core.MoveData(core, (Color)t.currentPlayerID, index), true);
 		}
 
 

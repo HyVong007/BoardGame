@@ -1,60 +1,45 @@
 ﻿using ExitGames.Client.Photon;
-using Newtonsoft.Json;
-using Photon.Pun;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
-using System.Runtime.Serialization;
 using UnityEngine;
 
 
 namespace BoardGames.GOChess
 {
-	public enum Color
+	public enum Color : byte
 	{
 		White = 0, Black = 1
 	}
 
 
 
-	[DataContract]
 	public sealed class Land
 	{
-		[DataMember] public int airHole;
-		[DataMember] public readonly List<Vector2Int> indexes = new List<Vector2Int>();
+		public readonly Color color;
+		/// <summary>
+		/// Số lổ thở của land<br/>
+		/// Lổ thở là ô trống ngay sát quân cờ của land và lổ thở ở các vị trí trên/dưới/trái/phải so với quân cờ.<para/>
+		/// CHÚ Ý: Các lổ thở của 1 land có thể trùng nhau và các land có thể có chung các lổ thở !
+		/// </summary>
+		public int airHole;
+		public readonly List<Vector2Int> indexes = new List<Vector2Int>();
 
-		public Land() { }
 
-		public Land(Land land)
+		public Land(in Color color) => this.color = color;
+
+		public Land(Land land) : this(land.color)
 		{
 			airHole = land.airHole;
 			indexes.AddRange(land.indexes);
 		}
+
+		public override string ToString() => $"({color}, airHole= {airHole}, indexes.Count= {indexes.Count}), ";
 	}
 
 
 
-	public sealed class Piece
-	{
-		public readonly Color color;
-		internal Land land;
-
-		public Piece(Color color) => this.color = color;
-
-		public Piece(Piece piece)
-		{
-			color = piece.color;
-			land = new Land(piece.land);
-		}
-
-
-		public override string ToString() => $"({color}, {land})";
-	}
-
-
-
-	[DataContract]
 	public sealed class Core
 	{
 		#region Khai báo dữ liệu và khởi tạo
@@ -67,18 +52,16 @@ namespace BoardGames.GOChess
 			[Color.White] = new List<Land>(),
 			[Color.Black] = new List<Land>()
 		};
-		private Piece[][] mailBox;
+		private Land[][] mailBox;
 		public Rect rect { get; private set; }
 
 
-		private static Core instance;
 		public Core(Vector2Int size, Action<Vector3Int, Color> drawPieceGUI, Action<Vector3Int> clearPieceGUI)
 		{
 			if (size.x < 2 || size.y < 2) throw new ArgumentOutOfRangeException($"Size phải >= (2, 2). size= {size}");
-			if (size.x * size.y > 10_000) throw new OutOfMemoryException($"Size quá lớn. size= {size}");
-			instance = this;
-			mailBox = new Piece[size.x][];
-			for (int x = 0; x < size.x; ++x) mailBox[x] = new Piece[size.y];
+			if (size.x > 100 || size.y > 100) throw new OutOfMemoryException($"Size quá lớn. size= {size}");
+			mailBox = new Land[size.x][];
+			for (int x = 0; x < size.x; ++x) mailBox[x] = new Land[size.y];
 			rect = new Rect(0, 0, size.x - 1, size.y - 1);
 			this.drawPieceGUI = drawPieceGUI;
 			this.clearPieceGUI = clearPieceGUI;
@@ -95,34 +78,13 @@ namespace BoardGames.GOChess
 		}
 
 
-		public Core(Core core, Action<Vector3Int, Color> drawPieceGUI, Action<Vector3Int> clearPieceGUI) : this(new Vector2Int(core.rect.width, core.rect.height), drawPieceGUI, clearPieceGUI)
-		{
-			if (core.state != null) throw new InvalidOperationException("Không thể copy bàn cờ đã kết thúc !");
-
-			var oldLand_newLand = new Dictionary<Land, Land>();
-			foreach (var color_list in core.lands)
-			{
-				var list = lands[color_list.Key];
-				foreach (var land in color_list.Value)
-					list.Add(oldLand_newLand[land] = new Land(land));
-			}
-
-			for (int x = 0; x < rect.width; ++x)
-				for (int y = 0; y < rect.height; ++y)
-				{
-					var piece = core.mailBox[x][y];
-					mailBox[x][y] = new Piece(piece.color) { land = oldLand_newLand[piece.land] };
-				}
-		}
-
-
-		public Piece this[int x, int y] => mailBox[x][y];
-		public Piece this[Vector2Int index] => mailBox[index.x][index.y];
+		public Land this[int x, int y] => mailBox[x][y];
+		public Land this[Vector2Int index] => mailBox[index.x][index.y];
 		#endregion
 
 
 		#region State
-		private readonly Dictionary<Color, int> pieceCounts = new Dictionary<Color, int>
+		private readonly Dictionary<Color, short> pieceCounts = new Dictionary<Color, short>
 		{
 			[Color.White] = -1,
 			[Color.Black] = -1
@@ -136,7 +98,7 @@ namespace BoardGames.GOChess
 			int c = 0;
 			var list = lands[color];
 			for (int i = 0; i < list.Count; ++i) c += list[i].indexes.Count;
-			return pieceCounts[color] = c;
+			return pieceCounts[color] = (short)c;
 		}
 
 
@@ -202,14 +164,14 @@ namespace BoardGames.GOChess
 		#endregion
 
 
-		#region CanMove
 		/// <summary>
-		/// <c>[<see cref="Color"/>] = { [<see cref="Land"/>] = point}</c>
+		/// Temporary cache<br/>
+		/// point là số tiếp điểm của land với ô đang kiểm tra<br/>
 		/// </summary>
-		private static readonly IReadOnlyDictionary<Color, Dictionary<Land, int>> tmp = new Dictionary<Color, Dictionary<Land, int>>
+		private static readonly IReadOnlyDictionary<Color, Dictionary<Land, byte>> color_land_point = new Dictionary<Color, Dictionary<Land, byte>>
 		{
-			[Color.White] = new Dictionary<Land, int>(),
-			[Color.Black] = new Dictionary<Land, int>()
+			[Color.White] = new Dictionary<Land, byte>(),
+			[Color.Black] = new Dictionary<Land, byte>()
 		};
 
 
@@ -217,28 +179,27 @@ namespace BoardGames.GOChess
 		{
 			if (mailBox[index.x][index.y] != null) return false;
 
-			tmp[Color.White].Clear();
-			tmp[Color.Black].Clear();
-			for (int d = 0, x, y; d < 4; ++d)
+			color_land_point[Color.White].Clear();
+			color_land_point[Color.Black].Clear();
+			for (int d = 0; d < 4; ++d)
 			{
-				var direction = DIRECTIONS[d];
-				x = index.x + direction.x; y = index.y + direction.y;
-				if (!rect.Contains(x, y)) goto CONTINUE_LOOP_DIRECTIONS;
-				var piece = mailBox[x][y];
-				if (piece == null) return true;
+				var pos = index + DIRECTIONS[d];
+				if (!rect.Contains(pos)) continue;
+				var land = mailBox[pos.x][pos.y];
+				if (land == null) return true;
 
-				if (!tmp[piece.color].ContainsKey(piece.land)) tmp[piece.color][piece.land] = 1;
-				else ++tmp[piece.color][piece.land];
-				CONTINUE_LOOP_DIRECTIONS:;
+				if (color_land_point[land.color].ContainsKey(land)) ++color_land_point[land.color][land];
+				else color_land_point[land.color][land] = 1;
 			}
 
-			for (int c = 0; c < 2; ++c)
-				foreach (var land_point in tmp[(Color)c])
-					if ((c == (int)color && land_point.Key.airHole > land_point.Value) || (c != (int)color && land_point.Key.airHole == land_point.Value)) return true;
+			foreach (var ally_point in color_land_point[color])
+				if (ally_point.Key.airHole > ally_point.Value) return true;
+
+			foreach (var enemy_point in color_land_point[color.Opponent()])
+				if (enemy_point.Key.airHole == enemy_point.Value) return true;
 
 			return false;
 		}
-		#endregion
 
 
 		#region Move
@@ -246,72 +207,47 @@ namespace BoardGames.GOChess
 		{
 			public int playerID { get; }
 			public readonly Vector2Int index;
-			internal readonly int emptyHole;
-			internal readonly List<Land> deadEnemies;
+			public readonly byte emptyHole;
+			public readonly IReadOnlyDictionary<Color, IReadOnlyDictionary<Land, byte>> color_land_point;
 
-			/// <summary>
-			/// <c>[<see cref="Land"/>] == airHole của <see cref="Land"/></c>
-			/// </summary>
-			internal readonly Dictionary<Land, int> enemies, allies;
 
-			/// <summary>
-			/// <c>[<see cref="Color"/>] == { [<see cref="Land"/>] == point}</c>
-			/// </summary>
-			private static readonly IReadOnlyDictionary<Color, Dictionary<Land, int>> tmp = new Dictionary<Color, Dictionary<Land, int>>
+			public MoveData(Core core, in Color color, in Vector2Int index)
 			{
-				[Color.White] = new Dictionary<Land, int>(),
-				[Color.Black] = new Dictionary<Land, int>()
-			};
-
-
-			internal MoveData(Core core, in Color color, in Vector2Int index)
-			{
-				this.index = index;
 				playerID = (int)color;
-				deadEnemies = new List<Land>();
-				enemies = new Dictionary<Land, int>();
-				allies = new Dictionary<Land, int>();
-				tmp[Color.White].Clear();
-				tmp[Color.Black].Clear();
-				emptyHole = 0;
+				this.index = index;
+				this.color_land_point = new Dictionary<Color, IReadOnlyDictionary<Land, byte>>
+				{
+					[Color.White] = new Dictionary<Land, byte>(),
+					[Color.Black] = new Dictionary<Land, byte>()
+				};
 
-				#region Tìm lổ trống và tất cả land.
+				var color_land_point = this.color_land_point as Dictionary<Color, IReadOnlyDictionary<Land, byte>>;
 				for (int d = 0; d < 4; ++d)
 				{
-					var direction = DIRECTIONS[d];
-					int x = index.x + direction.x, y = index.y + direction.y;
-					if (!core.rect.Contains(x, y)) continue;
-					var piece = core.mailBox[x][y];
-					if (piece == null) { ++emptyHole; continue; }
-
-					if (!tmp[piece.color].ContainsKey(piece.land)) tmp[piece.color][piece.land] = 1;
-					else ++tmp[piece.color][piece.land];
+					var pos = index + DIRECTIONS[d];
+					if (!core.rect.Contains(pos)) continue;
+					var land = core.mailBox[pos.x][pos.y];
+					if (land == null) ++emptyHole;
+					else if (color_land_point[land.color].ContainsKey(land)) ++(color_land_point[land.color] as Dictionary<Land, byte>)[land];
+					else (color_land_point[land.color] as Dictionary<Land, byte>)[land] = 1;
 				}
-				#endregion
-
-				#region Xác định land địch sắp chết, land địch còn sống và land mình.
-				for (int c = 0; c < 2; ++c)
-					foreach (var land_point in tmp[(Color)c])
-						if (c != (int)color && land_point.Key.airHole == land_point.Value) deadEnemies.Add(land_point.Key);
-						else if (c != (int)color) enemies[land_point.Key] = land_point.Value;
-						else allies[land_point.Key] = land_point.Value;
-				#endregion
-
-				tmp[Color.White].Clear();
-				tmp[Color.Black].Clear();
 			}
 
 
-			#region Json notsupported
-			[OnSerializing]
-			private void _(StreamingContext _) => throw new NotSupportedException();
-
-			[OnDeserializing]
-			private void __(StreamingContext _) => throw new NotSupportedException();
-			#endregion
+			internal MoveData(in int playerID, in Vector2Int index, in byte emptyHole, IReadOnlyDictionary<Color, IReadOnlyDictionary<Land, byte>> color_land_point)
+			{
+				this.playerID = playerID;
+				this.index = index;
+				this.emptyHole = emptyHole;
+				this.color_land_point = color_land_point;
+			}
 		}
 
 
+		/// <summary>
+		/// Core dùng để Deserialize MoveData
+		/// </summary>
+		internal static Core main;
 		static Core()
 		{
 			object @lock = new object();
@@ -323,10 +259,37 @@ namespace BoardGames.GOChess
 						var data = obj as MoveData;
 						using var stream = new MemoryStream();
 						using var writer = new BinaryWriter(stream);
-						writer.Write(data.playerID);
-						writer.Write(data.index.x);
-						writer.Write(data.index.y);
-						writer.Flush();
+						// playerID
+						writer.Write((byte)data.playerID);
+						// index
+						writer.Write((byte)data.index.x);
+						writer.Write((byte)data.index.y);
+						// emptyHole
+						writer.Write(data.emptyHole);
+						// color_land_point
+						foreach (var color_land_point in data.color_land_point)
+						{
+							// [Color]
+							writer.Write((byte)color_land_point.Key);
+							// land_point.Count
+							var land_point = color_land_point.Value;
+							writer.Write((byte)land_point.Count);
+							foreach (var l_p in land_point)
+							{
+								// [Land]
+								var land = l_p.Key;
+								// land.indexes[0]
+								writer.Write((byte)land.indexes[0].x);
+								writer.Write((byte)land.indexes[0].y);
+								// land.indexes.Count
+								writer.Write(land.indexes.Count);
+								// land.airHole
+								writer.Write((ushort)land.airHole);
+								// point
+								writer.Write((byte)l_p.Value);
+							}
+						}
+
 						return stream.ToArray();
 					}
 				},
@@ -336,180 +299,148 @@ namespace BoardGames.GOChess
 					{
 						using var stream = new MemoryStream(array);
 						using var reader = new BinaryReader(stream);
-						return new MoveData(instance, (Color)reader.ReadInt32(), new Vector2Int(reader.ReadInt32(), reader.ReadInt32()));
+						var color_land_point = new Dictionary<Color, IReadOnlyDictionary<Land, byte>>();
+						var data = new MoveData(
+							playerID: reader.ReadByte(),
+							index: new Vector2Int(reader.ReadByte(), reader.ReadByte()),
+							emptyHole: reader.ReadByte(),
+							color_land_point: color_land_point);
+
+						for (int a = 0; a < 2; ++a)
+						{
+							// Color
+							var land_point = new Dictionary<Land, byte>();
+							var color = (Color)reader.ReadByte();
+							color_land_point[color] = land_point;
+							for (int b = reader.ReadByte() - 1; b >= 0; --b)
+							{
+								// land.indexes[0]
+								var index = new Vector2Int(reader.ReadByte(), reader.ReadByte());
+								var land = main.mailBox[index.x][index.y];
+								if (land?.color != color
+								|| land.indexes.Count != reader.ReadInt32()
+								|| land.airHole != reader.ReadUInt16()) return null;
+
+								land_point[land] = reader.ReadByte();
+							}
+						}
+
+						return data;
 					}
 				});
 		}
 
 
-
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public MoveData GenerateMoveData(in Color color, in Vector2Int index) => new MoveData(this, color, index);
-
-
-		private Action<Vector3Int, Color> drawPieceGUI;
-		private Action<Vector3Int> clearPieceGUI;
+		private readonly Action<Vector3Int, Color> drawPieceGUI;
+		private readonly Action<Vector3Int> clearPieceGUI;
+		private static readonly Dictionary<Land, byte> land_point = new Dictionary<Land, byte>();
 		public void Move(MoveData data, History.Mode mode)
 		{
 			pieceCounts[Color.White] = pieceCounts[Color.Black] = -1;
-			var enemyColor = data.playerID == (int)Color.White ? Color.Black : Color.White;
+			land_point.Clear();
 			if (mode != History.Mode.Undo)
 			{
 				#region DO
-				#region Liên kết các land mình hiện tại tạo land mới cho cờ ở {data.index}
-				var piece = mailBox[data.index.x][data.index.y] = new Piece((Color)data.playerID);
-				piece.land = new Land() { airHole = data.emptyHole };
-				piece.land.indexes.Add(data.index);
-				lands[(Color)data.playerID].Add(piece.land);
-				foreach (var land_point in data.allies)
+				#region Tạo land mới vô bàn cờ và copy tất cả ally hiện tại, lấy ally hiện tại khỏi bàn cờ
+				var newLand = new Land((Color)data.playerID);
+				newLand.indexes.Add(data.index);
+				newLand.airHole = data.emptyHole;
+				lands[newLand.color].Add(newLand);
+				drawPieceGUI(data.index.ToVector3Int(), (Color)data.playerID);
+
+				foreach (var ally_point in data.color_land_point[newLand.color])
 				{
-					piece.land.airHole += (land_point.Key.airHole - land_point.Value);
-					piece.land.indexes.AddRange(land_point.Key.indexes);
-					var indexes = land_point.Key.indexes;
-					for (int i = 0; i < indexes.Count; ++i)
-					{
-						var index = indexes[i];
-						mailBox[index.x][index.y].land = piece.land;
-					}
-					lands[(Color)data.playerID].Remove(land_point.Key);
+					newLand.airHole += ally_point.Key.airHole - ally_point.Value;
+					newLand.indexes.AddRange(ally_point.Key.indexes);
+					lands[ally_point.Key.color].Remove(ally_point.Key);
+				}
+
+				for (int i = 0; i < newLand.indexes.Count; ++i)
+				{
+					var index = newLand.indexes[i];
+					mailBox[index.x][index.y] = newLand;
 				}
 				#endregion
 
-				#region Trừ lổ thở land địch
-				foreach (var enemy_point in data.enemies) enemy_point.Key.airHole -= enemy_point.Value;
-				for (int e = data.deadEnemies.Count - 1; e >= 0; --e)
+				#region Trừ lổ thở của enemy land
+				foreach (var enemy_point in data.color_land_point[newLand.color.Opponent()])
 				{
-					var enemy = data.deadEnemies[e];
+					if ((enemy_point.Key.airHole -= enemy_point.Value) > 0) continue;
 
-					// Giết land địch
-					lands[enemyColor].Remove(enemy);
-
+					// enemy bị chết, lấy khỏi bàn cờ
+					// xóa các quân cờ của enemy và tăng lổ thở cho các land xung quanh (nếu có, != enemy)
+					var enemy = enemy_point.Key;
+					lands[enemy.color].Remove(enemy);
 					for (int i = enemy.indexes.Count - 1; i >= 0; --i)
 					{
 						var index = enemy.indexes[i];
 						mailBox[index.x][index.y] = null;
 						clearPieceGUI(index.ToVector3Int());
-						for (int d = 0, __x, __y; d < 4; ++d)
+						for (int d = 0; d < 4; ++d)
 						{
-							__x = index.x + DIRECTIONS[d].x; __y = index.y + DIRECTIONS[d].y;
-							if (!rect.Contains(__x, __y)) continue;
-							var land = mailBox[__x][__y]?.land;
-							if (land != null && land != enemy) ++land.airHole;
+							var surround = index + DIRECTIONS[d];
+							if (!rect.Contains(surround)) continue;
+							var land = mailBox[surround.x][surround.y];
+							if (land == null || land == enemy) continue;
+							if (land_point.ContainsKey(land)) ++land_point[land];
+							else land_point[land] = 1;
 						}
+
+						foreach (var kvp in land_point) kvp.Key.airHole += kvp.Value;
 					}
 				}
 				#endregion
-
-				drawPieceGUI(data.index.ToVector3Int(), (Color)data.playerID);
 				#endregion
 			}
 			else
 			{
 				#region UNDO
 				mailBox[data.index.x][data.index.y] = null;
+				clearPieceGUI(data.index.ToVector3Int());
 
-				// Khôi phục con trỏ land mình
-				foreach (var land in data.allies.Keys)
-					foreach (var index in land.indexes) mailBox[index.x][index.y].land = land;
-
-				// Khôi phục lổ thở land địch còn sống
-				foreach (var enemy_point in data.enemies) enemy_point.Key.airHole += enemy_point.Value;
-
-				// Khôi phục land địch bị giết
-				for (int e = data.deadEnemies.Count - 1; e >= 0; --e)
+				#region Khôi phục ally land vào bàn cờ
+				foreach (var ally in data.color_land_point[(Color)data.playerID].Keys)
 				{
-					var enemy = data.deadEnemies[e];
-					lands[enemyColor].Add(enemy);
-					for (int i = enemy.indexes.Count - 1; i >= 0; --i)
+					lands[ally.color].Add(ally);
+					for (int i = ally.indexes.Count - 1; i >= 0; --i)
+					{
+						var index = ally.indexes[i];
+						mailBox[index.x][index.y] = ally;
+					}
+				}
+				#endregion
+
+				#region Khôi phục lổ thở của  enemy land
+				foreach (var enemy_point in data.color_land_point[(Color)(1 - data.playerID)])
+				{
+					if ((enemy_point.Key.airHole += enemy_point.Value) > enemy_point.Value) continue;
+
+					// enemy đã chết trước đó => hồi sinh vào bàn cờ và vẽ các quân cờ
+					// Trừ lổ thở của các land xung quanh (nếu có, !=enemy)
+					var enemy = enemy_point.Key;
+					lands[enemy.color].Add(enemy);
+					for (int i = 0; i < enemy.indexes.Count; ++i)
 					{
 						var index = enemy.indexes[i];
-						(mailBox[index.x][index.y] = new Piece(enemyColor)).land = enemy;
-						drawPieceGUI(index.ToVector3Int(), enemyColor);
+						mailBox[index.x][index.y] = enemy;
+						drawPieceGUI(index.ToVector3Int(), enemy.color);
+						for (int d = 0; d < 4; ++d)
+						{
+							var surround = index + DIRECTIONS[d];
+							if (!rect.Contains(surround)) continue;
+							var land = mailBox[surround.x][surround.y];
+							if (land == null || land == enemy) continue;
+							if (land_point.ContainsKey(land)) ++land_point[land];
+							else land_point[land] = 1;
+						}
+
+						foreach (var kvp in land_point) kvp.Key.airHole -= kvp.Value;
 					}
 				}
-
-				clearPieceGUI(data.index.ToVector3Int());
+				#endregion
 				#endregion
 			}
 		}
-		#endregion
-
-
-		#region Json
-		[DataContract]
-		private sealed class ΔJsonTemp
-		{
-			[DataMember] private readonly Dictionary<int, Land> id_land = new Dictionary<int, Land>();
-			[DataMember] private (Color color, int id)?[][] mailBox;
-
-			[JsonConstructor]
-			private ΔJsonTemp() { }
-
-
-			private static readonly Dictionary<Land, int> land_id = new Dictionary<Land, int>();
-			public ΔJsonTemp(Core core)
-			{
-				if (core.state != null) throw new InvalidOperationException("Bàn cờ đã kết thúc, không thể lưu json !");
-				land_id.Clear();
-
-				#region Khởi tạo {id_land}, {land_id}
-				int id = 0;
-				foreach (var color_list in core.lands)
-					foreach (var land in color_list.Value)
-					{
-						land_id[id_land[id] = land] = id;
-						++id;
-					}
-				#endregion
-
-				#region Khởi tạo {mailBox}
-				mailBox = new (Color color, int id)?[core.rect.width][];
-				for (int x = 0; x < core.rect.width; ++x)
-				{
-					mailBox[x] = new (Color color, int id)?[core.rect.height];
-					for (int y = 0; y < core.rect.height; ++y)
-					{
-						var piece = core.mailBox[x][y];
-						mailBox[x][y] = piece != null ? (piece.color, land_id[piece.land]) : ((Color color, int id)?)null;
-					}
-				}
-				#endregion
-
-				land_id.Clear();
-			}
-
-
-			public void Deserialize(Core core)
-			{
-				core.rect = new Rect(0, 0, mailBox.Length - 1, mailBox[0].Length - 1);
-				core.mailBox = new Piece[core.rect.width][];
-				for (int x = 0; x < core.rect.width; ++x)
-				{
-					core.mailBox[x] = new Piece[core.rect.height];
-					for (int y = 0; y < core.rect.height; ++y)
-					{
-						var p = mailBox[x][y];
-						var piece = core.mailBox[x][y] = p != null ? new Piece(p.Value.color) { land = id_land[p.Value.id] } : null;
-						if (piece != null) core.lands[piece.color].Add(piece.land);
-					}
-				}
-
-				core.Δtmp = null;
-			}
-		}
-		[DataMember] private ΔJsonTemp Δtmp;
-
-
-		[JsonConstructor]
-		private Core() { }
-
-
-		[OnSerializing]
-		private void OnSerializing(StreamingContext _) => Δtmp = new ΔJsonTemp(this);
-
-
-		[OnDeserialized]
-		private void OnDeserialized(StreamingContext _) => Δtmp.Deserialize(this);
 		#endregion
 	}
 
@@ -522,27 +453,5 @@ namespace BoardGames.GOChess
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static Color Opponent(this Color color) => (Color)(1 - (int)color);
-	}
-
-
-
-	/// <summary>
-	/// Định nghĩa cách lưu json cho <see cref="History"/> vì <see cref="Core.MoveData"/> không thể lưu json 
-	/// </summary>
-	public sealed class HistoryJsonConverter : JsonConverter
-	{
-		public override bool CanConvert(Type objectType) => objectType == typeof(History);
-
-
-		public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-		{
-			throw new NotImplementedException();
-		}
-
-
-		public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-		{
-			throw new NotImplementedException();
-		}
 	}
 }

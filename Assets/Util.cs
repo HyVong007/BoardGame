@@ -357,15 +357,15 @@ namespace BoardGames
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public bool Contains(Vector2Int index) => xMin <= index.x && index.x <= xMax && yMin <= index.y && index.y <= yMax;
+		public bool Contains(in Vector2Int index) => xMin <= index.x && index.x <= xMax && yMin <= index.y && index.y <= yMax;
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public bool Contains(int x, int y) => xMin <= x && x <= xMax && yMin <= y && y <= yMax;
+		public bool Contains(in int x, in int y) => xMin <= x && x <= xMax && yMin <= y && y <= yMax;
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public bool Contains((int x, int y) index) => Contains(index.x, index.y);
+		public bool Contains(in (int x, int y) index) => Contains(index.x, index.y);
 
 
 		public override string ToString() => $"(xMin= {xMin}, yMin= {yMin}, xMax= {xMax}, yMax= {yMax})";

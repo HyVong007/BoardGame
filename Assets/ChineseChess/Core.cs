@@ -10,14 +10,14 @@ using UnityEngine;
 
 namespace BoardGames.ChineseChess
 {
-	public enum Color
+	public enum Color : byte
 	{
 		Red = 0, Black = 1
 	}
 
 
 
-	public enum PieceName
+	public enum PieceName : byte
 	{
 		General = 0,
 		Advisor = 1,
@@ -96,9 +96,8 @@ namespace BoardGames.ChineseChess
 		[DataMember] private readonly bool hiddenChessRule;
 
 
-		private static Core instance;
 		[JsonConstructor]
-		private Core() { instance = this; }
+		private Core() { }
 
 
 		public Core(Piece?[][] mailBox = null)
@@ -106,7 +105,6 @@ namespace BoardGames.ChineseChess
 			if (mailBox != null && (mailBox.Length != 9 || mailBox[0].Length != 10))
 				throw new ArgumentOutOfRangeException("mailBox phải là 9x10 !");
 
-			instance = this;
 			mailBox ??= DEFAULT_MAILBOX;
 			for (int x = 0; x < 9; ++x)
 			{
@@ -490,10 +488,28 @@ namespace BoardGames.ChineseChess
 						var data = obj as MoveData;
 						using var stream = new MemoryStream();
 						using var writer = new BinaryWriter(stream);
-						writer.Write(data.from.x);
-						writer.Write(data.from.y);
-						writer.Write(data.to.x);
-						writer.Write(data.to.y);
+
+						// piece
+						writer.Write((byte)data.piece.color);
+						writer.Write((byte)data.piece.name);
+						writer.Write(data.piece.hidden);
+
+						// from, to
+						writer.Write((byte)data.from.x);
+						writer.Write((byte)data.from.y);
+						writer.Write((byte)data.to.x);
+						writer.Write((byte)data.to.y);
+
+						// capturedPiece
+						writer.Write(data.capturedPiece != null);
+						if (data.capturedPiece != null)
+						{
+							var p = data.capturedPiece.Value;
+							writer.Write((byte)p.color);
+							writer.Write((byte)p.name);
+							writer.Write(p.hidden);
+						}
+
 						writer.Flush();
 						return stream.ToArray();
 					}
@@ -504,7 +520,12 @@ namespace BoardGames.ChineseChess
 					{
 						using var stream = new MemoryStream(array);
 						using var reader = new BinaryReader(stream);
-						return instance.GenerateMoveData(new Vector2Int(reader.ReadInt32(), reader.ReadInt32()), new Vector2Int(reader.ReadInt32(), reader.ReadInt32()));
+
+						return new MoveData(
+							piece: new Piece((Color)reader.ReadByte(), (PieceName)reader.ReadByte(), reader.ReadBoolean()),
+							from: new Vector2Int(reader.ReadByte(), reader.ReadByte()),
+							to: new Vector2Int(reader.ReadByte(), reader.ReadByte()),
+							capturedPiece: reader.ReadBoolean() ? new Piece((Color)reader.ReadByte(), (PieceName)reader.ReadByte(), reader.ReadBoolean()) : (Piece?)null);
 					}
 				});
 		}
