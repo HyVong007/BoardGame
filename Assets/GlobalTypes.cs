@@ -1,6 +1,7 @@
 ﻿using BoardGames.Databases;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
+using Photon.Pun;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -289,7 +290,10 @@ namespace BoardGames
 
 		public static bool CurrentPlayerIsLocalHuman(this TurnManager t)
 			=> t is OfflineTurnManager ? (t as OfflineTurnManager).IsHumanPlayer(t.currentPlayerID)
-				: TablePlayer.Find(t.currentPlayerID).user == User.local;
+
+			// Test
+			: PhotonNetwork.IsMasterClient ^ t.currentPlayerID == 1;
+		//: TablePlayer.Find(t.currentPlayerID).user == User.local;
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]

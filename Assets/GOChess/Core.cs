@@ -15,12 +15,17 @@ namespace BoardGames.GOChess
 
 
 
+	/// <summary>
+	/// "Hòn đảo" hoặc "Đất liền": tập hợp liên tục các quân cờ cùng màu có tiếp xúc với nhau<br/>
+	/// Trong khi đó vùng trống trên bàn cờ là biển<br/>
+	/// 1 quân cờ riêng lẻ gọi là "Hòn đảo cô đơn". Nếu đảo bị bao vây hết đường bờ biển thì đảo sẽ biến mất (chết quân).
+	/// </summary>
 	public sealed class Land
 	{
 		public readonly Color color;
 		/// <summary>
-		/// Số lổ thở của land<br/>
-		/// Lổ thở là ô trống ngay sát quân cờ của land và lổ thở ở các vị trí trên/dưới/trái/phải so với quân cờ.<para/>
+		/// Số "lổ thở" của land hoặc độ dài đường bờ biển: Lổ thở là ô trống ngay sát quân cờ của land và lổ thở ở các vị trí trên/dưới/trái/phải so với quân cờ<br/>
+		/// Đường bờ biển càng dài thì land càng vững mạnh (khó chết)<para/>
 		/// CHÚ Ý: Các lổ thở của 1 land có thể trùng nhau và các land có thể có chung các lổ thở !
 		/// </summary>
 		public int airHole;
@@ -164,6 +169,7 @@ namespace BoardGames.GOChess
 		#endregion
 
 
+		#region CanMove
 		/// <summary>
 		/// Temporary cache<br/>
 		/// point là số tiếp điểm của land với ô đang kiểm tra<br/>
@@ -173,7 +179,6 @@ namespace BoardGames.GOChess
 			[Color.White] = new Dictionary<Land, byte>(),
 			[Color.Black] = new Dictionary<Land, byte>()
 		};
-
 
 		public bool CanMove(in Color color, in Vector2Int index)
 		{
@@ -200,6 +205,7 @@ namespace BoardGames.GOChess
 
 			return false;
 		}
+		#endregion
 
 
 		#region Move
@@ -215,13 +221,12 @@ namespace BoardGames.GOChess
 			{
 				playerID = (int)color;
 				this.index = index;
-				this.color_land_point = new Dictionary<Color, IReadOnlyDictionary<Land, byte>>
+				var color_land_point = new Dictionary<Color, IReadOnlyDictionary<Land, byte>>
 				{
 					[Color.White] = new Dictionary<Land, byte>(),
 					[Color.Black] = new Dictionary<Land, byte>()
 				};
-
-				var color_land_point = this.color_land_point as Dictionary<Color, IReadOnlyDictionary<Land, byte>>;
+				this.color_land_point = color_land_point;
 				for (int d = 0; d < 4; ++d)
 				{
 					var pos = index + DIRECTIONS[d];
@@ -333,6 +338,10 @@ namespace BoardGames.GOChess
 
 		private readonly Action<Vector3Int, Color> drawPieceGUI;
 		private readonly Action<Vector3Int> clearPieceGUI;
+		/// <summary>
+		/// Temporary cache<br/>
+		/// point là số tiếp điểm của land với ô đang kiểm tra<br/>
+		/// </summary>
 		private static readonly Dictionary<Land, byte> land_point = new Dictionary<Land, byte>();
 		public void Move(MoveData data, History.Mode mode)
 		{

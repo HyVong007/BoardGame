@@ -6,7 +6,7 @@ using UnityEditor.UI;
 #endif
 
 
-namespace BoardGames
+namespace BoardGames.Utils
 {
 	/// <summary>
 	/// Bắt event từ <see cref="GraphicRaycaster"/>, không làm gì liên quan UI<br/>

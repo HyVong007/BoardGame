@@ -31,7 +31,7 @@ namespace BoardGames
 
 			var config = "TURNBASE_CONFIG".GetValue<Config>();
 			PhotonNetwork.AddCallbackTarget(photonPun = new PhotonPun(this));
-			//PhotonNetwork.NetworkingClient.LoadBalancingPeer.ReuseEventInstance = true;
+			PhotonNetwork.NetworkingClient.LoadBalancingPeer.ReuseEventInstance = true;
 			playerIDGenerator = PlayerIDGenerator(2);
 			history.execute += (data, mode) => moveQueues.Enqueue((data, mode));
 		}
@@ -58,7 +58,7 @@ namespace BoardGames
 		{
 			get
 			{
-				throw new NotImplementedException();
+				return 0;
 			}
 		}
 

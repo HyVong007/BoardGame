@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 
-namespace BoardGames
+namespace BoardGames.Utils
 {
 	public sealed class TableIcon : MonoBehaviour
 	{

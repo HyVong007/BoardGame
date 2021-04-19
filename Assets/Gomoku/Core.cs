@@ -1,6 +1,5 @@
 ﻿using ExitGames.Client.Photon;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -55,6 +54,7 @@ namespace BoardGames.Gomoku
 
 		public Core(Vector2Int size)
 		{
+			if (size.x < 5 || size.y < 5) throw new ArgumentOutOfRangeException($"Size phải >= (5, 5). size= {size}");
 			if (size.x > 100 || size.y > 100) throw new OutOfMemoryException($"Size quá lớn. size= {size}");
 			mailBox = new Symbol?[size.x][];
 			for (int x = 0; x < size.x; ++x) mailBox[x] = new Symbol?[size.y];
@@ -161,17 +161,17 @@ namespace BoardGames.Gomoku
 		}
 
 
+		static readonly object @lock = new object();
 		static Core()
 		{
-			object @lock = new object();
 			PhotonPeer.RegisterType(typeof(MoveData), Util.NextCustomTypeCode(),
 				obj =>
 				{
 					lock (@lock)
 					{
-						var data = obj as MoveData;
 						using var stream = new MemoryStream();
 						using var writer = new BinaryWriter(stream);
+						var data = obj as MoveData;
 						writer.Write((byte)data.playerID);
 						writer.Write((byte)data.index.x);
 						writer.Write((byte)data.index.y);

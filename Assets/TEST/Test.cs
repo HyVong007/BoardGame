@@ -1,32 +1,13 @@
-﻿using UnityEngine;
-
+﻿using BoardGames.Utils;
+using Cysharp.Threading.Tasks;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 public class Test : MonoBehaviour
 {
-	private void Awake()
+	private void Update()
 	{
+		if (Keyboard.current.spaceKey.wasPressedThisFrame) UniTask.RunOnThreadPool(WinStandalone.Maximize);
 	}
-}
-
-
-
-namespace Covay
-{
-	public enum Color
-	{
-		White = 0, Black = 1
-	}
-
-
-
-
-
-
-
-
-
-
-
-
-
 }

@@ -49,11 +49,17 @@ namespace BoardGames.Gomoku
 		}
 
 
+		[SerializeField] private SerializableDictionaryBase<int, Sprite> playerID_sprite;
 		private void Start()
 		{
 			var t = TurnManager.instance;
 			t.AddListener(this);
 			t.IsGameOver += () => core.state != Core.State.Normal;
+
+			if (t is OfflineTurnManager)
+			{
+				OfflineChessBoardUI.instance.SetPlayerSprites(playerID_sprite);
+			}
 		}
 
 

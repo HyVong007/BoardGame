@@ -92,7 +92,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6429391641130434423}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5ff83a8c0e149e34abf84829c02cdc4e, type: 3}
   m_Name: 
@@ -102,7 +102,7 @@ MonoBehaviour:
   clickMaxSqrDistance: 2500
   longPressMinTime: 0
   m_dragType: 0
-  _interactable: 1
+  _interactable: 0
   activeColor: {r: 1, g: 1, b: 1, a: 1}
   disabledColor: {r: 1, g: 1, b: 1, a: 0.5}
 --- !u!61 &6429391641130434419
@@ -207,8 +207,8 @@ MonoBehaviour:
       elementIcon: {fileID: 0}
     reqReferences: {fileID: 0}
     isExpanded: 0
-    _keyValues: 0000000001000000
-    _keys: 0000000001000000
+    _keyValues: 0001
+    _keys: 0001
     _values:
     - {fileID: 11400000, guid: ec4e06fc69de49a4dbb619d572ecd491, type: 2}
     - {fileID: 11400000, guid: ac57b401177ece24f8e4c0753c00f997, type: 2}

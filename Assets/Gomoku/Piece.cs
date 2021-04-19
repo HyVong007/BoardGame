@@ -9,8 +9,7 @@ namespace BoardGames.Gomoku
 	public sealed class Piece : TileBase
 	{
 		[field: SerializeField] public Symbol symbol { get; private set; }
-		[ShowAssetPreview]
-		[SerializeField] private Sprite sprite;
+		[ShowAssetPreview] [SerializeField] private Sprite sprite;
 
 
 		public override void GetTileData(Vector3Int position, ITilemap tilemap, ref TileData tileData)

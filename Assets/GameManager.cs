@@ -1,15 +1,26 @@
 ﻿using BoardGames.Databases;
+using BoardGames.Utils;
 using Cysharp.Threading.Tasks;
 using RotaryHeart.Lib.SerializableDictionary;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 
 namespace BoardGames
 {
+	public enum MiniGame
+	{
+		Gomoku,
+		GOChess,
+		ChineseChess,
+		KingChess,
+		BattleShip
+	}
+
+
+
 	public sealed class GameManager : MonoBehaviour
 	{
 		[Serializable]
@@ -20,7 +31,7 @@ namespace BoardGames
 
 			public void Awake()
 			{
-				back.click += _ => Application.Quit();
+				//back.click += _ => Application.Quit();
 			}
 		}
 		[SerializeField] private TopPannel topPannel;
@@ -33,9 +44,6 @@ namespace BoardGames
 		[SerializeField] private BottomPannel bottomPannel;
 
 
-		/// <summary>
-		/// Tất cả bàn chơi của tất cả game
-		/// </summary>
 		[Serializable]
 		private sealed class OnlineTableView
 		{
@@ -106,8 +114,10 @@ namespace BoardGames
 		[SerializeField] private ScrollRect gameMenu;
 
 
+		private static GameManager instance;
 		private void Awake()
 		{
+			instance = instance ? throw new Exception() : this;
 			DontDestroyOnLoad(this);
 			topPannel.Awake();
 			foreach (var game_button in gameButtons) game_button.Value.click += _ => SelectGame(game_button.Key);
@@ -169,22 +179,5 @@ namespace BoardGames
 			}
 			return tables;
 		}
-
-
-		private void Update()
-		{
-			if (Keyboard.current.spaceKey.wasPressedThisFrame) "Gomoku/Scene/Main".UnloadScene();
-		}
-	}
-
-
-
-	public enum MiniGame
-	{
-		Gomoku,
-		GOChess,
-		ChineseChess,
-		KingChess,
-		BattleShip
 	}
 }

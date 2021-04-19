@@ -1,8 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
-using System;
-
-
-namespace BoardGames.Databases
+﻿namespace BoardGames.Databases
 {
 	public sealed class TablePlayer
 	{
