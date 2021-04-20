@@ -490,7 +490,7 @@ namespace BoardGames.KingChess
 
 
 		#region FindLegalMoves: Tìm các nước đi hợp lệ sau khi đã kiểm tra King xem có bị chiếu.
-		private static readonly List<int> list = new List<int>(64);
+		private  readonly List<int> list = new List<int>(64);
 
 
 		/// <summary>

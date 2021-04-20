@@ -1,5 +1,4 @@
-﻿using BoardGames.Gomoku;
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using RotaryHeart.Lib.SerializableDictionary;
 using System;
 using UnityEngine;
@@ -103,12 +102,7 @@ namespace BoardGames.GOChess
 		}
 
 
-
 		public void OnPlayerQuit(int playerID)
-		{
-		}
-
-		public void OnPlayerTimeOver(int playerID)
 		{
 		}
 
@@ -118,12 +112,7 @@ namespace BoardGames.GOChess
 		}
 
 
-
-		public void OnTurnEnd()
-		{
-		}
-
-		public void OnTurnTimeOver()
+		public void OnTurnEnd(bool isTimeOver)
 		{
 		}
 		#endregion

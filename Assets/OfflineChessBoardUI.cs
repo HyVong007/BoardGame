@@ -1,8 +1,10 @@
 ﻿using Cysharp.Threading.Tasks;
-using RotaryHeart.Lib.SerializableDictionary;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 
@@ -14,9 +16,25 @@ namespace BoardGames
 		[SerializeField] private Text turn, elapsedTurnTime;
 		[SerializeField] private Image currentPlayerImage;
 		[SerializeField] private Button buttonUndo, buttonRedo, buttonReplay, buttonBack;
+		/// <summary>
+		/// event handler: Trước khi bắt đầu công việc: đảm bảo người chơi không thể tương tác với game<br/>
+		/// Sau khi hoàn thành công việc: khôi phục tương tác của người chơi với game 
+		/// </summary>
 		[field: SerializeField] public Button buttonSetting { get; private set; }
+		/// <summary>
+		/// event handler: Trước khi bắt đầu công việc: đảm bảo người chơi không thể tương tác với game<br/>
+		/// Sau khi hoàn thành công việc: khôi phục tương tác của người chơi với game 
+		/// </summary>
 		[field: SerializeField] public Button buttonEnd { get; private set; }
+		/// <summary>
+		/// event handler: Trước khi bắt đầu công việc: đảm bảo người chơi không thể tương tác với game<br/>
+		/// Sau khi hoàn thành công việc: khôi phục tương tác của người chơi với game 
+		/// </summary>
 		[field: SerializeField] public Button buttonSave { get; private set; }
+		/// <summary>
+		/// event handler: Trước khi bắt đầu công việc: đảm bảo người chơi không thể tương tác với game<br/>
+		/// Sau khi hoàn thành công việc: khôi phục tương tác của người chơi với game 
+		/// </summary>
 		[field: SerializeField] public Button buttonLoad { get; private set; }
 		#endregion
 
@@ -25,12 +43,31 @@ namespace BoardGames
 		private void Awake()
 		{
 			instance = instance ? throw new Exception() : this;
+			buttonReplay.click += _ => SceneManager.LoadScene("Test");
+
+
+
 		}
 
 
 		private void Start()
 		{
-			TurnManager.instance.AddListener(this);
+			var t = TurnManager.instance;
+			t.AddListener(this);
+
+			var e = EventSystem.current;
+			buttonUndo.click += _ => SendRequest(Request.UNDO);
+			buttonRedo.click += _ => SendRequest(Request.REDO);
+
+
+			async void SendRequest(Request request)
+			{
+				e.gameObject.SetActive(false);
+				await t.SendRequest(request);
+				buttonUndo.interactable = t.CanUndo(t.currentPlayerID);
+				buttonRedo.interactable = t.CanRedo(t.currentPlayerID);
+				e.gameObject.SetActive(true);
+			}
 		}
 
 
@@ -54,19 +91,29 @@ namespace BoardGames
 
 		public void OnTurnBegin()
 		{
-#if DEBUG
-			if (playerID_sprite.Count == 0)
-				throw new Exception("Board.Start() phải cài playerID_sprite: sprite của quân cờ/người chơi tương ứng playerID !");
-#endif
 			var t = TurnManager.instance;
-			turn.text = $"Turn : {t.turn + 1}";
+			turn.text = $"Turn : {t.turn}";
 			currentPlayerImage.sprite = playerID_sprite[t.currentPlayerID];
+
+			if (t.CurrentPlayerIsLocalHuman())
+			{
+				buttonSave.interactable = true;
+				buttonUndo.interactable = t.CanUndo(t.currentPlayerID);
+				buttonRedo.interactable = t.CanRedo(t.currentPlayerID);
+			}
+		}
+
+
+		public void OnTurnEnd(bool isTimeOver)
+		{
+			buttonSave.interactable = buttonUndo.interactable = buttonRedo.interactable = false;
 		}
 
 
 		public void OnGameOver()
 		{
 		}
+
 
 		public async UniTask OnPlayerMove(IMoveData moveData, History.Mode mode)
 		{
@@ -76,21 +123,8 @@ namespace BoardGames
 		{
 		}
 
-		public void OnPlayerTimeOver(int playerID)
-		{
-		}
 
 		public async UniTask<bool> OnReceiveRequest(int playerID, Request request) => true;
-
-
-
-		public void OnTurnEnd()
-		{
-		}
-
-		public void OnTurnTimeOver()
-		{
-		}
 		#endregion
 	}
 }

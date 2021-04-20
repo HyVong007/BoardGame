@@ -122,7 +122,7 @@ namespace BoardGames.KingChess
 		public void OnTurnBegin() => currentPlayerIsLocalHuman = TurnManager.instance.CurrentPlayerIsLocalHuman();
 
 
-		public void OnTurnEnd() => currentPlayerIsLocalHuman = false;
+		public void OnTurnEnd(bool isTimeOver) => currentPlayerIsLocalHuman = false;
 
 
 		[SerializeField] private Transform moveTarget;
@@ -200,19 +200,7 @@ namespace BoardGames.KingChess
 		}
 
 
-		public void OnPlayerTimeOver(int playerID)
-		{
-			throw new System.NotImplementedException();
-		}
-
-
 		public UniTask<bool> OnReceiveRequest(int playerID, Request request)
-		{
-			throw new System.NotImplementedException();
-		}
-
-
-		public void OnTurnTimeOver()
 		{
 			throw new System.NotImplementedException();
 		}

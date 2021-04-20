@@ -111,13 +111,7 @@ namespace BoardGames.Gomoku
 		}
 
 
-
 		public void OnPlayerQuit(int playerID)
-		{
-		}
-
-
-		public void OnPlayerTimeOver(int playerID)
 		{
 		}
 
@@ -128,12 +122,7 @@ namespace BoardGames.Gomoku
 		}
 
 
-		public void OnTurnEnd()
-		{
-		}
-
-
-		public void OnTurnTimeOver()
+		public void OnTurnEnd(bool isTimeOver)
 		{
 		}
 		#endregion

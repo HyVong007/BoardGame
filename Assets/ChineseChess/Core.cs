@@ -293,7 +293,7 @@ namespace BoardGames.ChineseChess
 			[Color.Red] = (0, 1),
 			[Color.Black] = (0, -1)
 		};
-		private static readonly List<Vector2Int> pseudoList = new List<Vector2Int>(90);
+		private readonly List<Vector2Int> pseudoList = new List<Vector2Int>(90);
 
 
 		private Vector2Int[] FindPseudoLegalMoves(in Color color, in PieceName name, in Vector2Int index)
@@ -426,7 +426,7 @@ namespace BoardGames.ChineseChess
 
 
 		#region FindLegalMoves
-		private static readonly List<Vector2Int> legalList = new List<Vector2Int>(90);
+		private  readonly List<Vector2Int> legalList = new List<Vector2Int>(90);
 
 		private Vector2Int[] FindLegalMoves(in Color color, in PieceName name, in Vector2Int index)
 		{

@@ -82,6 +82,15 @@ namespace BoardGames
 
 		protected override void BeginTurn()
 		{
+#if UNITY_EDITOR
+			try
+			{
+				// Kiểm tra xem có bị Destroy chưa ?
+				var _ = gameObject;
+			}
+			catch { return; }
+#endif
+			checked { ++turn; }
 			playerIDGenerator.MoveNext();
 			foreach (var listener in listeners) listener.OnTurnBegin();
 
@@ -112,7 +121,7 @@ namespace BoardGames
 			}
 
 			history.Play(data);
-			await ExecuteMoveQueues();
+			await ExecuteMoveQueue();
 			if (endTurn) FinishTurn();
 		}
 
@@ -141,7 +150,7 @@ namespace BoardGames
 
 		protected override void FinishTurn()
 		{
-			foreach (var listener in listeners) listener.OnTurnEnd();
+			foreach (var listener in listeners) listener.OnTurnEnd(false); // test
 			if (IsGameOver())
 			{
 				foreach (var listener in listeners) listener.OnGameOver();
@@ -151,7 +160,7 @@ namespace BoardGames
 		}
 
 
-		private async UniTask ExecuteMoveQueues()
+		private async UniTask ExecuteMoveQueue()
 		{
 			do
 			{

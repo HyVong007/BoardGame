@@ -62,7 +62,7 @@ namespace BoardGames.Gomoku
 		}
 
 
-		public override void OnTurnEnd()
+		public override void OnTurnEnd(bool isTimeOver)
 		{
 		}
 

@@ -68,6 +68,7 @@ namespace BoardGames
 			}
 			catch { return; }
 #endif
+			checked { ++turn; }
 			playerIDGenerator.MoveNext();
 			foreach (var listener in listeners) listener.OnTurnBegin();
 			cacheElapsedTurnTime = 0;
@@ -78,7 +79,7 @@ namespace BoardGames
 		protected override void FinishTurn()
 		{
 			countTime = false;
-			foreach (var listener in listeners) listener.OnTurnEnd();
+			foreach (var listener in listeners) listener.OnTurnEnd(false);
 			if (IsGameOver())
 			{
 				foreach (var listener in listeners) listener.OnGameOver();
@@ -97,7 +98,7 @@ namespace BoardGames
 			}
 
 			history.Play(data);
-			await ExecuteMoveQueues();
+			await ExecuteMoveQueue();
 			if (endTurn) FinishTurn();
 		}
 
@@ -121,12 +122,12 @@ namespace BoardGames
 
 				case Request.UNDO:
 					history.Undo(currentPlayerID);
-					await ExecuteMoveQueues();
+					await ExecuteMoveQueue();
 					break;
 
 				case Request.REDO:
 					history.Redo(currentPlayerID);
-					await ExecuteMoveQueues();
+					await ExecuteMoveQueue();
 					break;
 			}
 
@@ -134,7 +135,7 @@ namespace BoardGames
 		}
 
 
-		private async UniTask ExecuteMoveQueues()
+		private async UniTask ExecuteMoveQueue()
 		{
 			countTime = false;
 			do
@@ -183,6 +184,7 @@ namespace BoardGames
 
 		#region NotSupported
 		public sealed override float remainTurnTime => throw new NotSupportedException();
+
 		public sealed override float RemainPlayerTime(int playerID) => throw new NotSupportedException();
 		#endregion
 	}

@@ -161,9 +161,9 @@ namespace BoardGames.Gomoku
 		}
 
 
-		static readonly object @lock = new object();
 		static Core()
 		{
+			object @lock = new object();
 			PhotonPeer.RegisterType(typeof(MoveData), Util.NextCustomTypeCode(),
 				obj =>
 				{

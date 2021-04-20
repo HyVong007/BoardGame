@@ -2,6 +2,7 @@
 using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using UnityEngine;
@@ -47,10 +48,13 @@ namespace BoardGames
 	public interface ITurnListener
 	{
 		void OnTurnBegin();
-		void OnTurnEnd();
+		/// <summary>
+		/// Lượt kết thúc do người chơi kết thúc hoặc lượt hết thời gian hoặc người chơi hiện tại hết thời gian<para/>
+		/// Kiểm tra <see cref="TurnManager.RemainPlayerTime(int)"/> để tìm người chơi hết thời gian
+		/// </summary>
+		/// <param name="isTimeOver"><see langword="true"/>: Lượt hết thời gian hoặc người chơi hiện tại hết thời gian</param>
+		void OnTurnEnd(bool isTimeOver);
 		UniTask OnPlayerMove(IMoveData moveData, History.Mode mode);
-		void OnTurnTimeOver();
-		void OnPlayerTimeOver(int playerID);
 		/// <summary>
 		/// Nhận được yêu cầu và đợi phản hồi. Người gửi yêu cầu sẽ không nhận yêu cầu<para/>
 		/// Có thể gửi yêu cầu bất cứ khi nào khi đang chơi game không cần đợi đến lượt mình
@@ -59,12 +63,13 @@ namespace BoardGames
 		UniTask<bool> OnReceiveRequest(int playerID, Request request);
 		/// <summary>
 		/// Người chơi thoát khỏi bàn chơi (<see cref="Table"/>).<para/>
-		/// Chỉ xảy ra (được gọi) khi <paramref name="playerID"/> thoát thì game còn lại &gt;= 2 người chơi
+		/// Được gọi khi <paramref name="playerID"/> thoát thì game còn lại &gt;= 2 người chơi
 		/// </summary>
 		/// <param name="playerID">Người chơi mới thoát</param>
 		void OnPlayerQuit(int playerID);
 		/// <summary>
-		/// Game kết thúc vì trạng thái game kết thúc hoặc chỉ còn lại 1 người chơi
+		/// Game kết thúc vì trạng thái game kết thúc hoặc chỉ còn lại 1 người chơi<para/>
+		/// Đặc biệt: nếu số lượt của bàn chơi đạt đến tối đa (<see cref="int.MaxValue"/>) thì sẽ kết thúc bàn chơi. Mỗi trò chơi tự quyết định kết quả.
 		/// </summary>
 		void OnGameOver();
 	}
@@ -75,44 +80,27 @@ namespace BoardGames
 	/// Lưu lại lịch sử các nước đi và cho phép Undo/ Redo.<br/>
 	/// Trạng thái bàn chơi chỉ được thay đổi thông qua <see cref="Play(IMoveData)"/>, <see cref="Undo(int)"/> và <see cref="Redo(int)"/>
 	/// </summary>
-	[DataContract]
 	public sealed class History
 	{
 		/// <summary>
 		/// Số lượng nước đi liên tục (Play) tối đa có thể lưu lại. > 0
 		/// </summary>
 		public const ushort CAPACITY = ushort.MaxValue;
-
-
-		public History() { }
-
-
-		public History(History history)
-		{
-			turn = history.turn;
-			recentMoves.AddRange(history.recentMoves);
-			undoneMoves.AddRange(history.undoneMoves);
-		}
-
-
-		[DataMember]
-		private readonly List<IMoveData> recentMoves = new List<IMoveData>(CAPACITY), undoneMoves = new List<IMoveData>(CAPACITY);
-
+		private readonly List<IMoveData> recentMoves = new List<IMoveData>(CAPACITY);
+		private readonly List<IMoveData[]> undoneMoves = new List<IMoveData[]>(CAPACITY);
 		/// <summary>
 		/// Số lượng nước đã đi (Play/Redo).
 		/// </summary>
 		public int moveCount => recentMoves.Count;
-
 		public IMoveData this[int index] => recentMoves[index];
-
-		[DataMember]
-		public int turn { get; private set; }
-
-
 		public enum Mode
 		{
 			Play, Undo, Redo
 		}
+		/// <summary>
+		/// Thực thi 1 nước đi (Play/Undo/Redo)<para/>
+		/// Chú ý: không nên sử dụng <see cref="History"/> trong event vì trạng thái <see cref="History"/> đang không hợp lệ !
+		/// </summary>
 		public event Action<IMoveData, Mode> execute;
 
 
@@ -120,7 +108,6 @@ namespace BoardGames
 		{
 			undoneMoves.Clear();
 			if (recentMoves.Count == CAPACITY) recentMoves.RemoveAt(0);
-			++turn;
 			recentMoves.Add(data);
 			execute(data, Mode.Play);
 		}
@@ -133,40 +120,52 @@ namespace BoardGames
 		}
 
 
+		private readonly List<IMoveData> tmpMoves = new List<IMoveData>();
 		public void Undo(int playerID)
 		{
-			int tmp;
+			tmpMoves.Clear();
+			int tmpID;
+
 			do
 			{
 				var move = recentMoves[recentMoves.Count - 1];
 				recentMoves.RemoveAt(recentMoves.Count - 1);
-				undoneMoves.Add(move);
-				--turn;
+				tmpMoves.Add(move);
 				execute(move, Mode.Undo);
-				tmp = move.playerID;
-			} while (tmp != playerID);
+				tmpID = move.playerID;
+			} while (tmpID != playerID);
+			undoneMoves.Add(tmpMoves.ToArray());
 		}
 
 
 		public bool CanRedo(int playerID)
 		{
-			for (int i = undoneMoves.Count - 1; i >= 0; --i) if (undoneMoves[i].playerID == playerID) return true;
+			for (int i = undoneMoves.Count - 1; i >= 0; --i)
+			{
+				var moves = undoneMoves[i];
+				if (moves[moves.Length - 1].playerID == playerID) return true;
+			}
 			return false;
 		}
 
 
 		public void Redo(int playerID)
 		{
-			int tmp;
+			int tmpID;
+
 			do
 			{
-				var move = undoneMoves[undoneMoves.Count - 1];
+				var moves = undoneMoves[undoneMoves.Count - 1];
 				undoneMoves.RemoveAt(undoneMoves.Count - 1);
-				recentMoves.Add(move);
-				++turn;
-				execute(move, Mode.Redo);
-				tmp = move.playerID;
-			} while (tmp != playerID);
+				for (int i = moves.Length - 1; i >= 0; --i)
+				{
+					var move = moves[i];
+					execute(move, Mode.Redo);
+					recentMoves.Add(move);
+				}
+
+				tmpID = moves[moves.Length - 1].playerID;
+			} while (tmpID != playerID);
 		}
 	}
 
@@ -233,7 +232,10 @@ namespace BoardGames
 
 		#region Lịch sử
 		protected History history { get; private set; }
-		public int turn => history.turn;
+		/// <summary>
+		/// Sử dụng checked{ } khi thay đổi value. Ví dụ: <c>checked{ ++turn; }</c>
+		/// </summary>
+		public int turn { get; protected set; }
 		public int moveCount => history.moveCount;
 		public IMoveData this[int index] => history[index];
 
@@ -286,13 +288,11 @@ namespace BoardGames
 		public abstract void OnGameOver();
 		public abstract UniTask OnPlayerMove(IMoveData data, History.Mode mode);
 		public abstract void OnTurnBegin();
-		public abstract void OnTurnEnd();
+		public abstract void OnTurnEnd(bool isTimeOver);
 		#endregion
 
 
 		#region Not supported
-		public void OnTurnTimeOver() => throw new NotSupportedException();
-		public void OnPlayerTimeOver(int playerID) => throw new NotSupportedException();
 		public void OnPlayerQuit(int playerID) => throw new NotSupportedException();
 		public UniTask<bool> OnReceiveRequest(int playerID, Request request) => throw new NotSupportedException();
 		#endregion

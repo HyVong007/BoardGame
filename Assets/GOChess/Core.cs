@@ -174,7 +174,7 @@ namespace BoardGames.GOChess
 		/// Temporary cache<br/>
 		/// point là số tiếp điểm của land với ô đang kiểm tra<br/>
 		/// </summary>
-		private static readonly IReadOnlyDictionary<Color, Dictionary<Land, byte>> color_land_point = new Dictionary<Color, Dictionary<Land, byte>>
+		private  readonly IReadOnlyDictionary<Color, Dictionary<Land, byte>> color_land_point = new Dictionary<Color, Dictionary<Land, byte>>
 		{
 			[Color.White] = new Dictionary<Land, byte>(),
 			[Color.Black] = new Dictionary<Land, byte>()
@@ -342,7 +342,7 @@ namespace BoardGames.GOChess
 		/// Temporary cache<br/>
 		/// point là số tiếp điểm của land với ô đang kiểm tra<br/>
 		/// </summary>
-		private static readonly Dictionary<Land, byte> land_point = new Dictionary<Land, byte>();
+		private  readonly Dictionary<Land, byte> land_point = new Dictionary<Land, byte>();
 		public void Move(MoveData data, History.Mode mode)
 		{
 			pieceCounts[Color.White] = pieceCounts[Color.Black] = -1;
