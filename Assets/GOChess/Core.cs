@@ -1,4 +1,5 @@
 ﻿using ExitGames.Client.Photon;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,7 +9,7 @@ using UnityEngine;
 
 namespace BoardGames.GOChess
 {
-	public enum Color : byte
+	public enum Color
 	{
 		White = 0, Black = 1
 	}
@@ -33,13 +34,11 @@ namespace BoardGames.GOChess
 
 
 		public Land(in Color color) => this.color = color;
-
 		public Land(Land land) : this(land.color)
 		{
 			airHole = land.airHole;
 			indexes.AddRange(land.indexes);
 		}
-
 		public override string ToString() => $"({color}, airHole= {airHole}, indexes.Count= {indexes.Count}), ";
 	}
 
@@ -61,19 +60,17 @@ namespace BoardGames.GOChess
 		public Rect rect { get; private set; }
 
 
-		public Core(Vector2Int size, Action<Vector3Int, Color> drawPieceGUI, Action<Vector3Int> clearPieceGUI)
+		public Core(Vector2Int size)
 		{
 			if (size.x < 2 || size.y < 2) throw new ArgumentOutOfRangeException($"Size phải >= (2, 2). size= {size}");
 			if (size.x > 100 || size.y > 100) throw new OutOfMemoryException($"Size quá lớn. size= {size}");
 			mailBox = new Land[size.x][];
 			for (int x = 0; x < size.x; ++x) mailBox[x] = new Land[size.y];
 			rect = new Rect(0, 0, size.x - 1, size.y - 1);
-			this.drawPieceGUI = drawPieceGUI;
-			this.clearPieceGUI = clearPieceGUI;
 		}
 
 
-		public Core(Color?[][] mailBox, Action<Vector3Int, Color> drawPieceGUI, Action<Vector3Int> clearPieceGUI) : this(new Vector2Int(mailBox.Length, mailBox[0].Length), drawPieceGUI, clearPieceGUI)
+		public Core(Color?[][] mailBox) : this(new Vector2Int(mailBox.Length, mailBox[0].Length))
 		{
 			var index = new Vector2Int();
 			for (index.x = 0; index.x < rect.width; ++index.x)
@@ -174,7 +171,7 @@ namespace BoardGames.GOChess
 		/// Temporary cache<br/>
 		/// point là số tiếp điểm của land với ô đang kiểm tra<br/>
 		/// </summary>
-		private  readonly IReadOnlyDictionary<Color, Dictionary<Land, byte>> color_land_point = new Dictionary<Color, Dictionary<Land, byte>>
+		private readonly IReadOnlyDictionary<Color, Dictionary<Land, byte>> color_land_point = new Dictionary<Color, Dictionary<Land, byte>>
 		{
 			[Color.White] = new Dictionary<Land, byte>(),
 			[Color.Black] = new Dictionary<Land, byte>()
@@ -246,6 +243,10 @@ namespace BoardGames.GOChess
 				this.emptyHole = emptyHole;
 				this.color_land_point = color_land_point;
 			}
+
+
+			public override string ToString() =>
+				$"data: ({(Color)playerID}, index= {index}, emptyHole= {emptyHole}, ally count= {color_land_point[(Color)playerID].Count}, enemy count= {color_land_point[(Color)(1 - playerID)].Count}), ";
 		}
 
 
@@ -336,13 +337,13 @@ namespace BoardGames.GOChess
 		}
 
 
-		private readonly Action<Vector3Int, Color> drawPieceGUI;
-		private readonly Action<Vector3Int> clearPieceGUI;
+		public event Action<Vector3Int, Color> drawPieceGUI;
+		public event Action<Vector3Int> clearPieceGUI;
 		/// <summary>
 		/// Temporary cache<br/>
 		/// point là số tiếp điểm của land với ô đang kiểm tra<br/>
 		/// </summary>
-		private  readonly Dictionary<Land, byte> land_point = new Dictionary<Land, byte>();
+		private readonly Dictionary<Land, byte> land_point = new Dictionary<Land, byte>();
 		public void Move(MoveData data, History.Mode mode)
 		{
 			pieceCounts[Color.White] = pieceCounts[Color.Black] = -1;
@@ -355,7 +356,7 @@ namespace BoardGames.GOChess
 				newLand.indexes.Add(data.index);
 				newLand.airHole = data.emptyHole;
 				lands[newLand.color].Add(newLand);
-				drawPieceGUI(data.index.ToVector3Int(), (Color)data.playerID);
+				drawPieceGUI?.Invoke(data.index.ToVector3Int(), (Color)data.playerID);
 
 				foreach (var ally_point in data.color_land_point[newLand.color])
 				{
@@ -384,7 +385,7 @@ namespace BoardGames.GOChess
 					{
 						var index = enemy.indexes[i];
 						mailBox[index.x][index.y] = null;
-						clearPieceGUI(index.ToVector3Int());
+						clearPieceGUI?.Invoke(index.ToVector3Int());
 						for (int d = 0; d < 4; ++d)
 						{
 							var surround = index + DIRECTIONS[d];
@@ -405,7 +406,7 @@ namespace BoardGames.GOChess
 			{
 				#region UNDO
 				mailBox[data.index.x][data.index.y] = null;
-				clearPieceGUI(data.index.ToVector3Int());
+				clearPieceGUI?.Invoke(data.index.ToVector3Int());
 
 				#region Khôi phục ally land vào bàn cờ
 				foreach (var ally in data.color_land_point[(Color)data.playerID].Keys)
@@ -432,7 +433,7 @@ namespace BoardGames.GOChess
 					{
 						var index = enemy.indexes[i];
 						mailBox[index.x][index.y] = enemy;
-						drawPieceGUI(index.ToVector3Int(), enemy.color);
+						drawPieceGUI?.Invoke(index.ToVector3Int(), enemy.color);
 						for (int d = 0; d < 4; ++d)
 						{
 							var surround = index + DIRECTIONS[d];
@@ -450,6 +451,43 @@ namespace BoardGames.GOChess
 				#endregion
 			}
 		}
+		#endregion
+
+
+		#region Json
+		private sealed class JsonConverterForCore : JsonConverter<Core>
+		{
+			public override Core ReadJson(JsonReader reader, Type objectType, Core existingValue, bool hasExistingValue, JsonSerializer serializer)
+				=> new Core(serializer.Deserialize<Color?[][]>(reader));
+
+
+			public override void WriteJson(JsonWriter writer, Core value, JsonSerializer serializer)
+			{
+				var mailBox = new Color?[value.mailBox.Length][];
+				int col = value.mailBox[0].Length;
+				for (int x = 0; x < mailBox.Length; ++x)
+				{
+					mailBox[x] = new Color?[col];
+					for (int y = 0; y < col; ++y) mailBox[x][y] = value.mailBox[x][y]?.color;
+				}
+				serializer.Serialize(writer, mailBox);
+			}
+		}
+
+
+		private sealed class JsonConverterForMoveData : JsonConverter<MoveData>
+		{
+			public override MoveData ReadJson(JsonReader reader, Type objectType, MoveData existingValue, bool hasExistingValue, JsonSerializer serializer)
+			{
+				return null;
+			}
+
+
+			public override void WriteJson(JsonWriter writer, MoveData value, JsonSerializer serializer)
+			{
+			}
+		}
+
 		#endregion
 	}
 

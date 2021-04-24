@@ -1,10 +1,9 @@
 ﻿using BoardGames.Databases;
 using Cysharp.Threading.Tasks;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Eventing.Reader;
 using System.Runtime.CompilerServices;
-using System.Runtime.Serialization;
 using UnityEngine;
 
 
@@ -54,6 +53,9 @@ namespace BoardGames
 		/// </summary>
 		/// <param name="isTimeOver"><see langword="true"/>: Lượt hết thời gian hoặc người chơi hiện tại hết thời gian</param>
 		void OnTurnEnd(bool isTimeOver);
+		/// <summary>
+		/// <see cref="ITurnListener.OnPlayerMove(IMoveData, History.Mode)"/> của tất cả <see cref="ITurnListener"/> luôn được bắt đầu tuần tự khi Play/Undo/Redo, sau đó <see cref="TurnManager"/> sẽ đợi tất cả task kết thúc !
+		/// </summary>
 		UniTask OnPlayerMove(IMoveData moveData, History.Mode mode);
 		/// <summary>
 		/// Nhận được yêu cầu và đợi phản hồi. Người gửi yêu cầu sẽ không nhận yêu cầu<para/>
@@ -68,8 +70,9 @@ namespace BoardGames
 		/// <param name="playerID">Người chơi mới thoát</param>
 		void OnPlayerQuit(int playerID);
 		/// <summary>
-		/// Game kết thúc vì trạng thái game kết thúc hoặc chỉ còn lại 1 người chơi<para/>
-		/// Đặc biệt: nếu số lượt của bàn chơi đạt đến tối đa (<see cref="int.MaxValue"/>) thì sẽ kết thúc bàn chơi. Mỗi trò chơi tự quyết định kết quả.
+		/// Game kết thúc vì trạng thái game kết thúc hoặc chỉ còn lại 1 người chơi<br/>
+		/// Đặc biệt: nếu số lượt của bàn chơi đạt đến tối đa (<see cref="int.MaxValue"/>) thì sẽ kết thúc bàn chơi. Mỗi trò chơi tự quyết định kết quả.<para/>
+		/// Đợi <see cref="OnPlayerMove(IMoveData, History.Mode)"/> kết thúc sau đó mới gọi
 		/// </summary>
 		void OnGameOver();
 	}
@@ -86,8 +89,8 @@ namespace BoardGames
 		/// Số lượng nước đi liên tục (Play) tối đa có thể lưu lại. > 0
 		/// </summary>
 		public const ushort CAPACITY = ushort.MaxValue;
-		private readonly List<IMoveData> recentMoves = new List<IMoveData>(CAPACITY);
-		private readonly List<IMoveData[]> undoneMoves = new List<IMoveData[]>(CAPACITY);
+		private readonly List<IMoveData> recentMoves;
+		private readonly List<IMoveData[]> undoneMoves;
 		/// <summary>
 		/// Số lượng nước đã đi (Play/Redo).
 		/// </summary>
@@ -102,6 +105,25 @@ namespace BoardGames
 		/// Chú ý: không nên sử dụng <see cref="History"/> trong event vì trạng thái <see cref="History"/> đang không hợp lệ !
 		/// </summary>
 		public event Action<IMoveData, Mode> execute;
+
+
+		public History()
+		{
+			recentMoves = new List<IMoveData>();
+			undoneMoves = new List<IMoveData[]>();
+		}
+
+
+		public History(History history) : this()
+		{
+			recentMoves.AddRange(history.recentMoves);
+			undoneMoves.AddRange(history.undoneMoves);
+			for (int i = 0; i < undoneMoves.Count; ++i)
+			{
+				var moves = undoneMoves[i];
+				Array.Copy(moves, undoneMoves[i] = new IMoveData[moves.Length], moves.Length);
+			}
+		}
 
 
 		public void Play(IMoveData data)
@@ -167,12 +189,105 @@ namespace BoardGames
 				tmpID = moves[moves.Length - 1].playerID;
 			} while (tmpID != playerID);
 		}
+
+
+		private History(List<IMoveData> recentMoves, List<IMoveData[]> undoneMoves)
+		{
+			this.recentMoves = recentMoves;
+			this.undoneMoves = undoneMoves;
+		}
+
+
+		private sealed class JsonConverter : JsonConverter<History>
+		{
+			private static readonly List<IMoveData> tmp = new List<IMoveData>();
+			public override History ReadJson(JsonReader reader, Type objectType, History existingValue, bool hasExistingValue, JsonSerializer serializer)
+			{
+				reader.Read(); // type
+				var type = Type.GetType($"{reader.ReadAsString()}, Assembly-CSharp");
+
+				#region  recentMoves
+				reader.Read(); // nameof
+				reader.Read(); // [
+				reader.Read(); // ] or {
+				var recentMoves = new List<IMoveData>();
+				while (reader.TokenType != JsonToken.EndArray)
+				{
+					// {
+					recentMoves.Add(serializer.Deserialize(reader, type) as IMoveData);
+					reader.Read(); // ] or {
+				}
+				#endregion
+
+				#region undoneMoves
+				reader.Read(); // nameof
+				reader.Read(); // [
+				reader.Read(); // ] or [
+				var undoneMoves = new List<IMoveData[]>();
+				while (reader.TokenType != JsonToken.EndArray)
+				{
+					// [ : quét item: IMoveData[]
+					while (reader.TokenType != JsonToken.EndArray)
+					{
+						// quét item: IMoveData
+						reader.Read(); // ] or {
+						tmp.Clear();
+						while (reader.TokenType != JsonToken.EndArray)
+						{
+							// {
+							tmp.Add(serializer.Deserialize(reader, type) as IMoveData);
+							reader.Read(); // ] or {
+						}
+						undoneMoves.Add(tmp.ToArray());
+					}
+					reader.Read(); // ] or [
+				}
+				#endregion
+
+				reader.Read(); // }
+				return new History(recentMoves, undoneMoves);
+			}
+
+
+			public override void WriteJson(JsonWriter writer, History value, JsonSerializer serializer)
+			{
+				writer.WriteStartObject();
+
+				// type
+				writer.WritePropertyName("type");
+				writer.WriteValue(value.recentMoves.Count > 0 ? value.recentMoves[0].GetType().FullName : "");
+
+				#region recentMoves
+				writer.WritePropertyName(nameof(value.recentMoves));
+				writer.WriteStartArray(); // [
+				for (int i = 0; i < value.recentMoves.Count; ++i)
+					serializer.Serialize(writer, value.recentMoves[i]);
+				writer.WriteEndArray(); // ]
+				#endregion
+
+				#region undoneMoves
+				writer.WritePropertyName(nameof(value.undoneMoves));
+				writer.WriteStartArray(); // [
+				for (int u = 0; u < value.undoneMoves.Count; ++u)
+				{
+					writer.WriteStartArray(); // [
+					var moves = value.undoneMoves[u];
+					for (int m = 0; m < moves.Length; ++m) serializer.Serialize(writer, moves[m]);
+					writer.WriteEndArray(); // ]
+				}
+				writer.WriteEndArray(); // ]
+				#endregion
+
+				writer.WriteEndObject();
+			}
+		}
 	}
 
 
 
 	public abstract class TurnManager : MonoBehaviour, ITime
 	{
+		[Serializable]
 		public class Config
 		{
 		}
@@ -201,13 +316,18 @@ namespace BoardGames
 		protected abstract void FinishTurn();
 		public abstract int currentPlayerID { get; }
 		/// <summary>
-		/// Đi 1 nước, nếu không có <paramref name="data"/> thì bỏ lượt, đồng thời có thể kết thúc lượt ngay sau khi đi.
+		/// Đi 1 nước, nếu không có <paramref name="data"/> thì bỏ lượt, đồng thời có thể kết thúc lượt ngay sau khi đi<para/>
+		/// Chú ý: Đảm bảo bắt đầu tuần tự các <see cref="ITurnListener.OnPlayerMove(IMoveData, History.Mode)"/> sau đó đợi tất cả quá trình <see langword="async"/> kết thúc<br/>
+		/// Ví dụ: ... <see langword="await"/> <see cref="UniTask.WhenAll(IEnumerable{UniTask})"/>  ...
 		/// </summary>
 		/// <param name="data">Nếu <see langword="null"/> thì bỏ lượt</param>
 		/// <param name="endTurn">Nếu <see langword="true"/> thì kết thúc lượt ngay sau khi đi</param>
 		public abstract UniTask Play(IMoveData data, bool endTurn);
 		/// <summary>
-		/// Gửi yêu cầu cho tất cả người chơi khác (ngoại trừ người chơi đã gửi yêu cầu)
+		/// Gửi yêu cầu cho tất cả người chơi khác (ngoại trừ người chơi đã gửi yêu cầu)<para/>
+		/// Chú ý với: Đảm bảo bắt đầu tuần tự các <see cref="ITurnListener.OnReceiveRequest(int, Request)"/> sau đó đợi tất cả quá trình <see langword="async"/> kết thúc<br/>
+		/// Ví dụ: ... <see langword="await"/> <see cref="UniTask.WhenAll(IEnumerable{UniTask})"/>  ...<para/>
+		/// Tương tự như trên, đảm bảo bắt đầu tuần tự các <see cref="ITurnListener.OnPlayerMove(IMoveData, History.Mode)"/> nếu Undo/Redo
 		/// </summary>
 		/// <returns><see langword="true"/> nếu tất cả người chơi khác chấp nhận yêu cầu</returns>
 		public abstract UniTask<bool> SendRequest(Request request);
@@ -231,7 +351,7 @@ namespace BoardGames
 
 
 		#region Lịch sử
-		protected History history { get; private set; }
+		protected History history;
 		/// <summary>
 		/// Sử dụng checked{ } khi thay đổi value. Ví dụ: <c>checked{ ++turn; }</c>
 		/// </summary>

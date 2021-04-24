@@ -160,12 +160,15 @@ namespace BoardGames
 		}
 
 
+		private readonly List<UniTask> moveTasks = new List<UniTask>();
 		private async UniTask ExecuteMoveQueue()
 		{
 			do
 			{
 				var (data, mode) = moveQueues.Dequeue();
-				foreach (var listener in listeners) await listener.OnPlayerMove(data, mode);
+				moveTasks.Clear();
+				foreach (var listener in listeners) moveTasks.Add(listener.OnPlayerMove(data, mode));
+				await UniTask.WhenAll(moveTasks);
 			} while (moveQueues.Count != 0);
 		}
 

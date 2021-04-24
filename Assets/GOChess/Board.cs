@@ -1,7 +1,9 @@
 ﻿using Cysharp.Threading.Tasks;
 using RotaryHeart.Lib.SerializableDictionary;
 using System;
+using System.IO;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 
 
@@ -9,8 +11,9 @@ namespace BoardGames.GOChess
 {
 	public sealed class Board : MonoBehaviour, ITurnListener
 	{
-		public sealed class Config
+		public struct Config
 		{
+			public Core core;
 			public Color?[][] mailBox;
 			public Vector2Int size;
 		}
@@ -25,9 +28,26 @@ namespace BoardGames.GOChess
 		{
 			instance = instance ? throw new Exception() : this;
 			var config = "BOARD_CONFIG".GetValue<Config>();
-			Core.main = core = config.mailBox != null ? new Core(config.mailBox, DrawPieceGUI, ClearPieceGUI)
-				: new Core(config.size, DrawPieceGUI, ClearPieceGUI);
+			core = Core.main = config.core ??
+				(config.mailBox != null ? new Core(config.mailBox)
+				: new Core(config.size));
 			var rect = core.rect;
+
+			#region Vẽ quân cờ
+			if (config.core != null || config.mailBox != null)
+			{
+				Vector3Int index = default;
+				for (index.x = 0; index.x < rect.width; ++index.x)
+					for (index.y = 0; index.y < rect.height; ++index.y)
+					{
+						var color = core[index.x, index.y]?.color;
+						if (color != null) DrawPieceGUI(index, color.Value);
+					}
+			}
+			#endregion
+
+			core.drawPieceGUI += DrawPieceGUI;
+			core.clearPieceGUI += ClearPieceGUI;
 			backgroundMap.size = gridMap.size = new Vector3Int(rect.width - 1, rect.height - 1, 0);
 			pieceMap.size = new Vector3Int(rect.width, rect.height, 0);
 			backgroundMap.origin = gridMap.origin = pieceMap.origin = Vector3Int.zero;
@@ -37,17 +57,53 @@ namespace BoardGames.GOChess
 			button.transform.localPosition = new Vector3(rect.width / 2f, rect.height / 2f);
 			button.click += OnPlayerClick;
 			Camera.main.transform.position = new Vector3(rect.width / 2f, rect.height / 2f, -10);
+
+			if (config.core != null)
+			{
+				config.core = null;
+				"BOARD_CONFIG".SetValue(config);
+			}
 		}
 
 
 		private void OnDisable() => Core.main = null;
 
 
+		[SerializeField] private SerializableDictionaryBase<int, Sprite> playerID_sprite;
 		private void Start()
 		{
 			var t = TurnManager.instance;
 			t.AddListener(this);
 			t.IsGameOver += () => core.state != null;
+
+			if (t is OfflineTurnManager)
+			{
+				var ui = OfflineChessBoardUI.instance;
+				ui.SetPlayerSprites(playerID_sprite);
+
+				ui.buttonSave.click += _ =>
+				{
+					var turnData = new OfflineTurnManager.SaveData(t as OfflineTurnManager)
+					{
+						history = new History()
+					};
+
+					File.WriteAllLines($"{Application.persistentDataPath}/SaveData.txt", new string[]
+					{
+						turnData.ToJson(),
+						 core.ToJson()
+					});
+				};
+
+				ui.buttonLoad.click += _ =>
+				{
+					var lines = File.ReadAllLines($"{Application.persistentDataPath}/SaveData.txt");
+					"TURN_SAVE_DATA".SetValue(lines[0].FromJson<OfflineTurnManager.SaveData>());
+					var c = new Config { core = lines[1].FromJson<Core>() };
+					"BOARD_CONFIG".SetValue(c);
+					SceneManager.LoadScene("Test");
+				};
+			}
 		}
 
 

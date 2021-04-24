@@ -104,6 +104,12 @@ namespace BoardGames
 		}
 
 
+		public async UniTask OnPlayerMove(IMoveData moveData, History.Mode mode)
+		{
+			if (TurnManager.instance.IsGameOver()) buttonSave.interactable = false;
+		}
+
+
 		public void OnTurnEnd(bool isTimeOver)
 		{
 			buttonSave.interactable = buttonUndo.interactable = buttonRedo.interactable = false;
@@ -113,11 +119,7 @@ namespace BoardGames
 		public void OnGameOver()
 		{
 		}
-
-
-		public async UniTask OnPlayerMove(IMoveData moveData, History.Mode mode)
-		{
-		}
+		
 
 		public void OnPlayerQuit(int playerID)
 		{

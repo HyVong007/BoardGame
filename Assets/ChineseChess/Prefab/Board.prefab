@@ -672,6 +672,34 @@ MonoBehaviour:
         - {fileID: 8168305917043884910}
         - {fileID: 8168305916087763826}
         - {fileID: 8168305916965705824}
+  playerID_sprite:
+    reorderableList:
+      canAdd: 1
+      canRemove: 1
+      draggable: 1
+      expandable: 1
+      multipleSelection: 1
+      isExpanded: 0
+      label:
+        m_Text: Keys
+        m_Image: {fileID: 0}
+        m_Tooltip: 
+      headerHeight: 18
+      footerHeight: 13
+      slideEasing: 0.15
+      verticalSpacing: 2
+      showDefaultBackground: 1
+      elementDisplayType: 0
+      elementNameProperty: 
+      elementNameOverride: 
+      elementIcon: {fileID: 0}
+    reqReferences: {fileID: 0}
+    isExpanded: 0
+    _keyValues: 0000000001000000
+    _keys: 0000000001000000
+    _values:
+    - {fileID: -7512434501291994743, guid: 17df19499ff85f54594db73c56014f9f, type: 3}
+    - {fileID: -6930793143504519088, guid: 17df19499ff85f54594db73c56014f9f, type: 3}
   cellFlag: {fileID: 8168305917526916633}
   hintPool:
     prefab: {fileID: 8168305917734617609}

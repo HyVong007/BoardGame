@@ -1,16 +1,18 @@
 ﻿using Cysharp.Threading.Tasks;
 using RotaryHeart.Lib.SerializableDictionary;
 using System;
+using System.IO;
 using UnityEngine;
-
+using UnityEngine.SceneManagement;
 
 namespace BoardGames.ChineseChess
 {
 	[RequireComponent(typeof(Button), typeof(BoxCollider2D))]
 	public sealed class Board : MonoBehaviour, ITurnListener
 	{
-		public sealed class Config
+		public struct Config
 		{
+			public Core core;
 			public Piece?[][] mailBox;
 		}
 
@@ -36,8 +38,8 @@ namespace BoardGames.ChineseChess
 			}
 		}
 		[Serializable]
-		private sealed class PieceName_ListPieceGUI : SerializableDictionaryBase<PieceName, PieceGUIArray> { }
-		[SerializeField] private SerializableDictionaryBase<Color, PieceName_ListPieceGUI> pieces;
+		private sealed class PieceName_PieceGUIArray : SerializableDictionaryBase<PieceName, PieceGUIArray> { }
+		[SerializeField] private SerializableDictionaryBase<Color, PieceName_PieceGUIArray> pieces;
 
 		public Core core { get; private set; }
 		private readonly PieceGUI[][] mailBox = new PieceGUI[9][];
@@ -46,7 +48,14 @@ namespace BoardGames.ChineseChess
 		{
 			instance = instance ? throw new Exception() : this;
 			var config = "BOARD_CONFIG".GetValue<Config>();
-			core = new Core(config.mailBox);
+			if (config.core != null)
+			{
+				core = config.core;
+				config.core = null;
+				"BOARD_CONFIG".SetValue(config);
+			}
+			else core = new Core(config.mailBox);
+
 			for (int x = 0; x < 9; ++x)
 			{
 				mailBox[x] = new PieceGUI[10];
@@ -61,11 +70,33 @@ namespace BoardGames.ChineseChess
 		}
 
 
+		[SerializeField] private SerializableDictionaryBase<int, Sprite> playerID_sprite;
 		private void Start()
 		{
 			var t = TurnManager.instance;
 			t.AddListener(this);
 			t.IsGameOver += () => core.GetState(Color.Red) == Core.State.CheckMate || core.GetState(Color.Black) == Core.State.CheckMate;
+
+			if (t is OfflineTurnManager)
+			{
+				var ui = OfflineChessBoardUI.instance;
+				ui.SetPlayerSprites(playerID_sprite);
+
+				ui.buttonSave.click += _ =>
+					  File.WriteAllLines($"{Application.persistentDataPath}/SaveData.txt", new string[]
+					  {
+						  new OfflineTurnManager.SaveData(t as OfflineTurnManager).ToJson(),
+						  core.ToJson()
+					  });
+
+				ui.buttonLoad.click += _ =>
+				  {
+					  var lines = File.ReadAllLines($"{Application.persistentDataPath}/SaveData.txt");
+					  "TURN_SAVE_DATA".SetValue(lines[0].FromJson<OfflineTurnManager.SaveData>());
+					  "BOARD_CONFIG".SetValue(new Config { core = lines[1].FromJson<Core>() });
+					  SceneManager.LoadScene("Test");
+				  };
+			}
 		}
 
 

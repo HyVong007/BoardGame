@@ -428,14 +428,14 @@ MonoBehaviour:
   pieceMap: {fileID: 7425700521726530063}
   backgroundTile: {fileID: 11400000, guid: fc9536ae40d047d4082614bf4d7fc566, type: 2}
   gridTile: {fileID: 11400000, guid: 69ad84865a93957408c794dea2c3b904, type: 2}
-  pieceTiles:
+  playerID_sprite:
     reorderableList:
       canAdd: 1
       canRemove: 1
       draggable: 1
       expandable: 1
       multipleSelection: 1
-      isExpanded: 1
+      isExpanded: 0
       label:
         m_Text: Keys
         m_Image: {fileID: 0}
@@ -450,9 +450,37 @@ MonoBehaviour:
       elementNameOverride: 
       elementIcon: {fileID: 0}
     reqReferences: {fileID: 0}
-    isExpanded: 1
-    _keyValues: 0001
-    _keys: 0001
+    isExpanded: 0
+    _keyValues: 0000000001000000
+    _keys: 0000000001000000
+    _values:
+    - {fileID: 21300000, guid: a56dc1d0ed1ae3940b8d59d424425783, type: 3}
+    - {fileID: 21300000, guid: aad0167433faf0f4db2c1eeca22771d1, type: 3}
+  pieceTiles:
+    reorderableList:
+      canAdd: 1
+      canRemove: 1
+      draggable: 1
+      expandable: 1
+      multipleSelection: 1
+      isExpanded: 0
+      label:
+        m_Text: Keys
+        m_Image: {fileID: 0}
+        m_Tooltip: 
+      headerHeight: 18
+      footerHeight: 13
+      slideEasing: 0.15
+      verticalSpacing: 2
+      showDefaultBackground: 1
+      elementDisplayType: 0
+      elementNameProperty: 
+      elementNameOverride: 
+      elementIcon: {fileID: 0}
+    reqReferences: {fileID: 0}
+    isExpanded: 0
+    _keyValues: 0000000001000000
+    _keys: 0000000001000000
     _values:
     - {fileID: 11400000, guid: 42b7027b60f8709409e473ed52826691, type: 2}
     - {fileID: 11400000, guid: 2a3aa5c5185cc1145b6b0617bc0b178d, type: 2}

@@ -800,6 +800,34 @@ MonoBehaviour:
         freeAnchor: {fileID: 4662135626562231720}
         free:
         - {fileID: 4662135627533954029}
+  playerID_sprite:
+    reorderableList:
+      canAdd: 1
+      canRemove: 1
+      draggable: 1
+      expandable: 1
+      multipleSelection: 1
+      isExpanded: 1
+      label:
+        m_Text: Keys
+        m_Image: {fileID: 0}
+        m_Tooltip: 
+      headerHeight: 18
+      footerHeight: 13
+      slideEasing: 0.15
+      verticalSpacing: 2
+      showDefaultBackground: 1
+      elementDisplayType: 0
+      elementNameProperty: 
+      elementNameOverride: 
+      elementIcon: {fileID: 0}
+    reqReferences: {fileID: 0}
+    isExpanded: 1
+    _keyValues: 0000000001000000
+    _keys: 0000000001000000
+    _values:
+    - {fileID: 21300000, guid: ee0968072b48a434cad28ab83aeccee9, type: 3}
+    - {fileID: 21300000, guid: ab4d5e2cca5406b4f9440db997148ccf, type: 3}
   cellFlag: {fileID: 4662135626900862288}
   hintPool:
     prefab: {fileID: 4662135627161352498}

@@ -10,14 +10,14 @@ using UnityEngine;
 
 namespace BoardGames.ChineseChess
 {
-	public enum Color : byte
+	public enum Color
 	{
 		Red = 0, Black = 1
 	}
 
 
 
-	public enum PieceName : byte
+	public enum PieceName
 	{
 		General = 0,
 		Advisor = 1,
@@ -27,7 +27,6 @@ namespace BoardGames.ChineseChess
 		Cannon = 5,
 		Pawn = 6
 	}
-
 
 
 	[DataContract]
@@ -55,11 +54,10 @@ namespace BoardGames.ChineseChess
 
 
 
-	[DataContract]
 	public sealed class Core
 	{
 		#region Khai báo dữ liệu và khởi tạo
-		[DataMember] private readonly Piece?[][] mailBox = new Piece?[9][];
+		private readonly Piece?[][] mailBox = new Piece?[9][];
 		private static readonly Piece?[][] DEFAULT_MAILBOX = new Piece?[][]
 		{
 			// FILE A
@@ -89,15 +87,10 @@ namespace BoardGames.ChineseChess
 			// FILE I
 			new Piece?[]{new Piece(Color.Red, PieceName.Rook),null, null, new Piece( Color.Red, PieceName.Pawn), null, null, new Piece( Color.Black, PieceName.Pawn), null, null, new Piece( Color.Black, PieceName.Rook) },
 		};
-
 		/// <summary>
 		/// if <see langword="true"/> : Chơi theo luật Cờ Úp
 		/// </summary>
-		[DataMember] private readonly bool hiddenChessRule;
-
-
-		[JsonConstructor]
-		private Core() { }
+		private readonly bool hiddenChessRule;
 
 
 		public Core(Piece?[][] mailBox = null)
@@ -150,7 +143,6 @@ namespace BoardGames.ChineseChess
 			Normal, Check, CheckMate
 		}
 
-		[DataMember]
 		private readonly Dictionary<Color, State> states = new Dictionary<Color, State>
 		{
 			[Color.Red] = State.Normal,
@@ -161,7 +153,7 @@ namespace BoardGames.ChineseChess
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public State GetState(Color color) => states[color];
 
-		[DataMember] private readonly Dictionary<Color, Vector2Int> generalIndexes = new Dictionary<Color, Vector2Int>(2);
+		private readonly Dictionary<Color, Vector2Int> generalIndexes = new Dictionary<Color, Vector2Int>(2);
 		private bool GeneralIsChecked(Color color)
 		{
 			var G = generalIndexes[color];
@@ -426,7 +418,7 @@ namespace BoardGames.ChineseChess
 
 
 		#region FindLegalMoves
-		private  readonly List<Vector2Int> legalList = new List<Vector2Int>(90);
+		private readonly List<Vector2Int> legalList = new List<Vector2Int>(90);
 
 		private Vector2Int[] FindLegalMoves(in Color color, in PieceName name, in Vector2Int index)
 		{
@@ -471,6 +463,9 @@ namespace BoardGames.ChineseChess
 				this.to = to;
 				this.capturedPiece = capturedPiece;
 			}
+
+
+			[JsonConstructor] private MoveData() { }
 
 
 			public override string ToString() => $"(piece= {piece}, from= {from}, to= {to}, capturedPiece= {capturedPiece})";
@@ -614,6 +609,19 @@ namespace BoardGames.ChineseChess
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool IsInsideBoard(in int x, in int y) => -1 < x && x < 9 && -1 < y && y < 10;
+
+
+		#region Json
+		private sealed class JsonConverter : JsonConverter<Core>
+		{
+			public override Core ReadJson(JsonReader reader, Type objectType, Core existingValue, bool hasExistingValue, JsonSerializer serializer)
+				=> new Core(serializer.Deserialize<Piece?[][]>(reader));
+
+
+			public override void WriteJson(JsonWriter writer, Core value, JsonSerializer serializer)
+				=> serializer.Serialize(writer, value.mailBox);
+		}
+		#endregion
 	}
 
 

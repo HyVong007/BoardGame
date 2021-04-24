@@ -5,28 +5,26 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
-using System.Runtime.Serialization;
 using System.Threading;
 using UnityEngine;
 
 
 namespace BoardGames.KingChess
 {
-	public enum PieceName : byte
+	public enum PieceName
 	{
 		Pawn = 0, Rook = 1, Bishop = 2, Knight = 3, Queen = 4, King = 5
 	}
 
 
 
-	public enum Color : byte
+	public enum Color
 	{
 		White = 0, Black = 1
 	}
 
 
 
-	[DataContract]
 	public sealed class Core
 	{
 		private const ulong
@@ -46,7 +44,6 @@ namespace BoardGames.KingChess
 		/// <summary>
 		/// Nhớ update <see cref="mailBox"/> sau khi kết thúc modify
 		/// </summary>
-		[DataMember]
 		private readonly IReadOnlyDictionary<Color, Dictionary<PieceName, ulong>> bitboards = new Dictionary<Color, Dictionary<PieceName, ulong>>
 		{
 			[Color.White] = new Dictionary<PieceName, ulong>
@@ -68,12 +65,7 @@ namespace BoardGames.KingChess
 				[PieceName.Rook] = 0UL
 			}
 		};
-		[DataMember]
 		private readonly (Color playerID, PieceName name)?[][] mailBox = new (Color playerID, PieceName name)?[8][];
-
-
-		[JsonConstructor]
-		private Core() { }
 
 
 		private static readonly (Color playerID, PieceName name)?[][] DEFAULT_MAILBOX = new (Color playerID, PieceName name)?[][]
@@ -104,10 +96,17 @@ namespace BoardGames.KingChess
 		};
 		public Core((Color playerID, PieceName name)?[][] mailBox = null)
 		{
-			if (mailBox != null && (mailBox.Length != 8 || mailBox[0].Length != 8)) throw new Exception("mailBox phải là 8x8 !");
+			if (mailBox != null && (mailBox.Length != 8 || mailBox[0].Length != 8))
+				throw new ArgumentOutOfRangeException("mailBox phải là 8x8 !");
 			mailBox ??= DEFAULT_MAILBOX;
 
 			#region Khởi tạo {bitboards}, {mailBox}, {rookHistory}
+			rookHistory = new Dictionary<Color, Dictionary<int, (bool moved, int count)>>
+			{
+				[Color.White] = new Dictionary<int, (bool moved, int count)>(),
+				[Color.Black] = new Dictionary<int, (bool moved, int count)>()
+			};
+
 			for (int x = 0; x < 8; ++x) this.mailBox[x] = new (Color playerID, PieceName name)?[8];
 			for (int index = 0, y = 0; y < 8; ++y)
 				for (int x = 0; x < 8; ++x, ++index)
@@ -124,16 +123,30 @@ namespace BoardGames.KingChess
 					}
 			#endregion
 
-			#region Khởi tạo {kingHistory}
-			kingHistory[Color.White] = mailBox[4][0] == (Color.White, PieceName.King) ? (false, 0) : (true, 0);
-			kingHistory[Color.Black] = mailBox[4][7] == (Color.Black, PieceName.King) ? (false, 0) : (true, 0);
-			#endregion
+			kingHistory = new Dictionary<Color, (bool moved, int count)>
+			{
+				[Color.White] = mailBox[4][0] == (Color.White, PieceName.King) ? (false, 0) : (true, 0),
+				[Color.Black] = mailBox[4][7] == (Color.Black, PieceName.King) ? (false, 0) : (true, 0)
+			};
+
+			states = new Dictionary<Color, State>
+			{
+				[Color.White] = State.Normal,
+				[Color.Black] = State.Normal
+			};
 		}
 
 
-		public Core(History history, Core board)
+		public static (Color playerID, PieceName name)?[][] CloneDefaultMailBox()
 		{
-			throw new NotImplementedException();
+			var result = new (Color playerID, PieceName name)?[8][];
+			for (int x = 0; x < 8; ++x)
+			{
+				result[x] = new (Color playerID, PieceName name)?[8];
+				for (int y = 0; y < 8; ++y) result[x][y] = DEFAULT_MAILBOX[x][y];
+			}
+
+			return result;
 		}
 		#endregion
 
@@ -142,17 +155,12 @@ namespace BoardGames.KingChess
 		/// <summary>
 		/// moved == <see langword="true"/>: đã di chuyển, không thể khôi phục trạng thái ban đầu.
 		/// </summary>
-		[DataMember] private readonly Dictionary<Color, (bool moved, int count)> kingHistory = new Dictionary<Color, (bool moved, int count)>(2);
+		private Dictionary<Color, (bool moved, int count)> kingHistory;
 
 		/// <summary>
 		/// moved == <see langword="true"/>: đã di chuyển, không thể khôi phục trạng thái ban đầu.
 		/// </summary>
-		[DataMember]
-		private readonly IReadOnlyDictionary<Color, Dictionary<int, (bool moved, int count)>> rookHistory = new Dictionary<Color, Dictionary<int, (bool moved, int count)>>
-		{
-			[Color.White] = new Dictionary<int, (bool moved, int count)>(),
-			[Color.Black] = new Dictionary<int, (bool moved, int count)>()
-		};
+		private IReadOnlyDictionary<Color, Dictionary<int, (bool moved, int count)>> rookHistory;
 		#endregion
 
 
@@ -162,12 +170,7 @@ namespace BoardGames.KingChess
 			Normal, Check, CheckMate
 		}
 
-		[DataMember]
-		private readonly Dictionary<Color, State> states = new Dictionary<Color, State>
-		{
-			[Color.White] = State.Normal,
-			[Color.Black] = State.Normal
-		};
+		private Dictionary<Color, State> states;
 		public event Action<Color, State> onStateChanged;
 
 
@@ -490,7 +493,7 @@ namespace BoardGames.KingChess
 
 
 		#region FindLegalMoves: Tìm các nước đi hợp lệ sau khi đã kiểm tra King xem có bị chiếu.
-		private  readonly List<int> list = new List<int>(64);
+		private readonly List<int> list = new List<int>(64);
 
 
 		/// <summary>
@@ -578,30 +581,29 @@ namespace BoardGames.KingChess
 
 
 		#region Move
-		[DataContract]
 		public sealed class MoveData : IMoveData
 		{
-			[DataMember] public int playerID { get; internal set; }
-			[DataMember] public int from, to;
-			[DataMember] public PieceName name;
-			[DataMember] public PieceName? capturedName;
+			public int playerID { get; internal set; }
+			public int from, to;
+			public PieceName name;
+			public PieceName? capturedName;
 
 			/// <summary>
 			/// Lịch sử của quân Xe bị bắt.
 			/// </summary>
-			[DataMember] public (bool moved, int count) capturedRookHistory;
+			public (bool moved, int count) capturedRookHistory;
 
 			/// <summary>
 			/// Bắt Tốt qua đường (Enpassant): index của quân đối phương bị bắt thông qua enpassant.
 			/// </summary>
-			[DataMember] public int? enpassantCapturedIndex;
+			public int? enpassantCapturedIndex;
 
 			/// <summary>
 			/// Quân sẽ được phong cấp (promotion).<br/>
 			/// Không thể phong cấp thành <see cref="PieceName.Pawn"/> hoặc <see cref="PieceName.King"/>
 			/// <para>!= <see langword="null"/> khi: <c><see cref="name"/> == <see cref="PieceName.Pawn"/></c> và tọa độ <see cref="to"/> nằm ở rank cuối cùng (<see cref="RANK_1"/> hoặc <see cref="RANK_8"/> tùy theo <see cref="MoveData.playerID"/>)</para>
 			/// </summary>
-			[DataMember] public PieceName? promotedName;
+			public PieceName? promotedName;
 
 			public enum Castling
 			{
@@ -611,7 +613,7 @@ namespace BoardGames.KingChess
 			/// Trạng thái nhập Thành<para/>
 			/// Luôn di chuyển Vua đầu tiên và Vua di chuyển gây ra Nhập Thành
 			/// </summary>
-			[DataMember] public Castling castling;
+			public Castling castling;
 
 
 			public override string ToString() => $"color= {playerID}, name= {name}, from= {from.ToMailBoxIndex()}, to= {to.ToMailBoxIndex()}, capturedName= {capturedName}, " +
@@ -993,6 +995,49 @@ namespace BoardGames.KingChess
 
 			bitboards[(Color)data.playerID][data.name] = PIECE;
 			if (data.capturedName != null) bitboards[((Color)data.playerID).Opponent()][data.capturedName.Value] = OPPONENT_PIECE;
+		}
+		#endregion
+
+
+		#region Json
+		private sealed class JsonConverter : JsonConverter<Core>
+		{
+			public override Core ReadJson(JsonReader reader, Type objectType, Core existingValue, bool hasExistingValue, JsonSerializer serializer)
+			{
+				reader.Read(); // nameof
+				reader.Read();
+				var core = new Core(serializer.Deserialize<(Color playerID, PieceName name)?[][]>(reader));
+				reader.Read(); // nameof
+				reader.Read();
+				core.kingHistory = serializer.Deserialize<Dictionary<Color, (bool moved, int cound)>>(reader);
+				reader.Read(); // nameof
+				reader.Read();
+				core.rookHistory = serializer.Deserialize<IReadOnlyDictionary<Color, Dictionary<int, (bool moved, int count)>>>(reader);
+				reader.Read(); // nameof
+				reader.Read();
+				core.states = serializer.Deserialize<Dictionary<Color, State>>(reader);
+				reader.Read(); // }
+				return core;
+			}
+
+
+			public override void WriteJson(JsonWriter writer, Core value, JsonSerializer serializer)
+			{
+				writer.WriteStartObject();
+				// mailBox
+				writer.WritePropertyName(nameof(value.mailBox));
+				serializer.Serialize(writer, value.mailBox);
+				// kingHistory
+				writer.WritePropertyName(nameof(value.kingHistory));
+				serializer.Serialize(writer, value.kingHistory);
+				// rookHistory
+				writer.WritePropertyName(nameof(value.rookHistory));
+				serializer.Serialize(writer, value.rookHistory);
+				// states
+				writer.WritePropertyName(nameof(value.states));
+				serializer.Serialize(writer, value.states);
+				writer.WriteEndObject();
+			}
 		}
 		#endregion
 	}

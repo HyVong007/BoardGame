@@ -9,9 +9,28 @@ namespace BoardGames
 {
 	public sealed class OfflineTurnManager : TurnManager
 	{
+		[Serializable]
 		public new class Config : TurnManager.Config
 		{
 			public readonly IReadOnlyDictionary<int, bool> isHumanPlayer = new Dictionary<int, bool>();
+		}
+
+
+		[Serializable]
+		public struct SaveData
+		{
+			public Config config;
+			public int turn, currentPlayerID;
+			public History history;
+
+
+			public SaveData(OfflineTurnManager t)
+			{
+				config = "TURNBASE_CONFIG".GetValue<Config>();
+				turn = t.turn;
+				currentPlayerID = t.currentPlayerID;
+				history = new History(t.history);
+			}
 		}
 
 
@@ -28,15 +47,27 @@ namespace BoardGames
 		{
 			base.Awake();
 			if (!gameObject.activeSelf) return;
+			Config config = null;
+
+			#region Load SaveData
+			if ("TURN_SAVE_DATA".TryGetValue(out SaveData data))
+			{
+				"TURN_SAVE_DATA".Remove();
+				config = data.config;
+				checked { turn = data.turn - 1; }
+				playerIDGenerator = PlayerIDGenerator(data.config.isHumanPlayer.Count, data.currentPlayerID);
+				history = data.history;
+			}
+			#endregion
 
 			history.execute += (data, mode) => moveQueues.Enqueue((data, mode));
-			var config = "TURNBASE_CONFIG".GetValue<Config>();
+			config ??= "TURNBASE_CONFIG".GetValue<Config>();
 			for (int i = config.isHumanPlayer.Count - 1; i >= 0; --i)
 			{
 				playerStartTimes[i] = float.MaxValue;
 				elapsedPlayerTimes[i] = 0;
 			}
-			playerIDGenerator = PlayerIDGenerator(config.isHumanPlayer.Count);
+			playerIDGenerator ??= PlayerIDGenerator(config.isHumanPlayer.Count);
 
 			#region isHumanPlayer và sinh AI
 			var isHumanPlayer = this.isHumanPlayer as Dictionary<int, bool>;
@@ -52,8 +83,9 @@ namespace BoardGames
 
 		public sealed override int currentPlayerID => playerIDGenerator.Current;
 		private IEnumerator<int> playerIDGenerator;
-		private static IEnumerator<int> PlayerIDGenerator(int maxPlayer)
+		private static IEnumerator<int> PlayerIDGenerator(int maxPlayer, int currentPlayerID = 0)
 		{
+			for (int i = currentPlayerID; i < maxPlayer; ++i) yield return i;
 			while (true) for (int i = 0; i < maxPlayer; ++i) yield return i;
 		}
 
@@ -135,13 +167,16 @@ namespace BoardGames
 		}
 
 
+		private readonly List<UniTask> moveTasks = new List<UniTask>();
 		private async UniTask ExecuteMoveQueue()
 		{
 			countTime = false;
 			do
 			{
 				var (data, mode) = moveQueues.Dequeue();
-				foreach (var listener in listeners) await listener.OnPlayerMove(data, mode);
+				moveTasks.Clear();
+				foreach (var listener in listeners) moveTasks.Add(listener.OnPlayerMove(data, mode));
+				await UniTask.WhenAll(moveTasks);
 			} while (moveQueues.Count != 0);
 			countTime = true;
 		}

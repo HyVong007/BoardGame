@@ -1,5 +1,4 @@
-﻿using BoardGames.Databases;
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
 using Photon.Pun;
 using System;
@@ -35,9 +34,9 @@ namespace BoardGames
 
 		public static bool TryGetValue<TValue>(this string key, out TValue value)
 		{
-			bool result = dict.TryGetValue(key, out object v);
-			value = (TValue)v;
-			return result;
+			bool hasValue = dict.TryGetValue(key, out object v);
+			value = hasValue ? (TValue)v : default;
+			return hasValue;
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -296,11 +295,30 @@ namespace BoardGames
 		//: TablePlayer.Find(t.currentPlayerID).user == User.local;
 
 
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static string ToJson(this object obj) => JsonConvert.SerializeObject(obj);
+		#region Json
+		private static readonly object lock_json = new object();
+
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static T FromJson<T>(this string json) => JsonConvert.DeserializeObject<T>(json);
+		public static string ToJson(this object obj)
+		{
+			lock (lock_json) { return JsonConvert.SerializeObject(obj); }
+		}
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static T FromJson<T>(this string json)
+		{
+			lock (lock_json) { return JsonConvert.DeserializeObject<T>(json); }
+		}
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static object FromJson(this string json, Type type)
+		{
+			lock (lock_json) { return JsonConvert.DeserializeObject(json, type); }
+		}
+		#endregion
 
 
 		private static ushort customTypeCode;

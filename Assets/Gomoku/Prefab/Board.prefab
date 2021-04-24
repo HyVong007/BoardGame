@@ -207,11 +207,39 @@ MonoBehaviour:
       elementIcon: {fileID: 0}
     reqReferences: {fileID: 0}
     isExpanded: 0
-    _keyValues: 0001
-    _keys: 0001
+    _keyValues: 0000000001000000
+    _keys: 0000000001000000
     _values:
     - {fileID: 11400000, guid: ec4e06fc69de49a4dbb619d572ecd491, type: 2}
     - {fileID: 11400000, guid: ac57b401177ece24f8e4c0753c00f997, type: 2}
+  playerID_sprite:
+    reorderableList:
+      canAdd: 1
+      canRemove: 1
+      draggable: 1
+      expandable: 1
+      multipleSelection: 1
+      isExpanded: 0
+      label:
+        m_Text: Keys
+        m_Image: {fileID: 0}
+        m_Tooltip: 
+      headerHeight: 18
+      footerHeight: 13
+      slideEasing: 0.15
+      verticalSpacing: 2
+      showDefaultBackground: 1
+      elementDisplayType: 0
+      elementNameProperty: 
+      elementNameOverride: 
+      elementIcon: {fileID: 0}
+    reqReferences: {fileID: 0}
+    isExpanded: 0
+    _keyValues: 0000000001000000
+    _keys: 0000000001000000
+    _values:
+    - {fileID: 21300000, guid: e7a124bd534538c4894a474c63955c73, type: 3}
+    - {fileID: 21300000, guid: dff4e670367a886448c067ce4fc8fe58, type: 3}
   flag: {fileID: 6429391642358768293}
   linePool:
     prefab: {fileID: 6429391641946014374}

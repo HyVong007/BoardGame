@@ -1,8 +1,5 @@
 using BoardGames;
-using BoardGames.Databases;
 using BoardGames.Gomoku;
-using Cysharp.Threading.Tasks;
-using Photon.Pun;
 using RotaryHeart.Lib.SerializableDictionary;
 using System.Collections.Generic;
 using UnityEngine;
@@ -17,10 +14,11 @@ public class TestGomoku : MonoBehaviour
 
 	private void Awake()
 	{
-		"BOARD_CONFIG".SetValue(new Board.Config
-		{
-			size = size,
-		});
+		if (!"BOARD_CONFIG".TryGetValue(out Board.Config c) || c.core == null)
+			"BOARD_CONFIG".SetValue(new Board.Config
+			{
+				size = size,
+			});
 
 		var config = new OfflineTurnManager.Config();
 		var dict = config.isHumanPlayer as Dictionary<int, bool>;

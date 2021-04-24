@@ -1,7 +1,10 @@
 ﻿using Cysharp.Threading.Tasks;
+using Newtonsoft.Json;
 using RotaryHeart.Lib.SerializableDictionary;
 using System;
+using System.IO;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 
 
@@ -9,8 +12,9 @@ namespace BoardGames.Gomoku
 {
 	public sealed class Board : MonoBehaviour, ITurnListener
 	{
-		public sealed class Config
+		public struct Config
 		{
+			public Core core;
 			public Symbol?[][] mailBox;
 			public Vector2Int size;
 		}
@@ -26,8 +30,8 @@ namespace BoardGames.Gomoku
 		{
 			instance = instance ? throw new Exception() : this;
 			var config = "BOARD_CONFIG".GetValue<Config>();
+			core = config.core ?? (config.mailBox != null ? new Core(config.mailBox) : new Core(config.size));
 
-			core = config.mailBox != null ? new Core(config.mailBox) : new Core(config.size);
 			var rect = core.rect;
 			button.transform.localScale = new Vector3(rect.width, rect.height);
 			button.click += OnPlayerClick;
@@ -36,7 +40,7 @@ namespace BoardGames.Gomoku
 			grid.size = pieceMap.size = new Vector3Int(rect.width, rect.height, 0);
 			grid.FloodFill(Vector3Int.zero, tileGrid);
 
-			if (config.mailBox != null)
+			if (config.core != null || config.mailBox != null)
 			{
 				Vector3Int index = default;
 				for (index.x = 0; index.x < rect.width; ++index.x)
@@ -45,6 +49,12 @@ namespace BoardGames.Gomoku
 						var symbol = core[index.x, index.y];
 						if (symbol != null) pieceMap.SetTile(index, pieces[symbol.Value]);
 					}
+			}
+
+			if (config.core != null)
+			{
+				config.core = null;
+				"BOARD_CONFIG".SetValue(config);
 			}
 		}
 
@@ -58,7 +68,24 @@ namespace BoardGames.Gomoku
 
 			if (t is OfflineTurnManager)
 			{
-				OfflineChessBoardUI.instance.SetPlayerSprites(playerID_sprite);
+				var ui = OfflineChessBoardUI.instance;
+				ui.SetPlayerSprites(playerID_sprite);
+
+				ui.buttonSave.click += _ =>
+					  File.WriteAllLines($"{Application.persistentDataPath}/SaveData.txt", new string[]
+					  {
+						  new OfflineTurnManager.SaveData(t as OfflineTurnManager).ToJson(),
+						  core.ToJson()
+					  });
+
+				ui.buttonLoad.click += _ =>
+				  {
+					  var lines = File.ReadAllLines($"{Application.persistentDataPath}/SaveData.txt");
+					  "TURN_SAVE_DATA".SetValue(lines[0].FromJson<OfflineTurnManager.SaveData>());
+					  var c = new Config { core = lines[1].FromJson<Core>() };
+					  "BOARD_CONFIG".SetValue(c);
+					  SceneManager.LoadScene("Test");
+				  };
 			}
 		}
 

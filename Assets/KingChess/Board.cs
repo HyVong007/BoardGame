@@ -1,16 +1,18 @@
 ﻿using Cysharp.Threading.Tasks;
 using RotaryHeart.Lib.SerializableDictionary;
 using System;
+using System.IO;
 using UnityEngine;
-
+using UnityEngine.SceneManagement;
 
 namespace BoardGames.KingChess
 {
 	[RequireComponent(typeof(Button), typeof(BoxCollider2D))]
 	public sealed class Board : MonoBehaviour, ITurnListener
 	{
-		public sealed class Config
+		public struct Config
 		{
+			public Core core;
 			public (Color playerID, PieceName name)?[][] mailBox;
 		}
 
@@ -25,7 +27,13 @@ namespace BoardGames.KingChess
 		{
 			instance = instance ? throw new Exception() : this;
 			var config = "BOARD_CONFIG".GetValue<Config>();
-			core = new Core(config.mailBox);
+			if (config.core != null)
+			{
+				core = config.core;
+				config.core = null;
+				"BOARD_CONFIG".SetValue(config);
+			}
+			else core = new Core(config.mailBox);
 			for (int x = 0; x < 8; ++x)
 			{
 				mailBox[x] = new Piece[8];
@@ -40,11 +48,34 @@ namespace BoardGames.KingChess
 		}
 
 
+		[SerializeField] private SerializableDictionaryBase<int, Sprite> playerID_sprite;
 		private void Start()
 		{
 			var t = TurnManager.instance;
 			t.AddListener(this);
 			t.IsGameOver += () => core.GetState(Color.White) == Core.State.CheckMate || core.GetState(Color.Black) == Core.State.CheckMate;
+
+			if (t is OfflineTurnManager)
+			{
+				var ui = OfflineChessBoardUI.instance;
+				ui.SetPlayerSprites(playerID_sprite);
+
+				ui.buttonSave.click += _ =>
+				  File.WriteAllLines($"{Application.persistentDataPath}/SaveData.txt", new string[]
+				  {
+						new OfflineTurnManager.SaveData(t as OfflineTurnManager).ToJson(),
+						core.ToJson()
+				  });
+
+				ui.buttonLoad.click += _ =>
+				{
+					var lines = File.ReadAllLines($"{Application.persistentDataPath}/SaveData.txt");
+					"TURN_SAVE_DATA".SetValue(lines[0].FromJson<OfflineTurnManager.SaveData>());
+					var c = new Config { core = lines[1].FromJson<Core>() };
+					"BOARD_CONFIG".SetValue(c);
+					SceneManager.LoadScene("Test");
+				};
+			}
 		}
 
 
@@ -182,8 +213,43 @@ namespace BoardGames.KingChess
 			else
 			{
 				#region UNDO
-				throw new NotImplementedException();
+				var piece = mailBox[to.x][to.y];
 
+				#region Lấy quân {data.name} hoặc {data.promotedName} ra khỏi ô vị trí {to}
+				if (data.promotedName != null)
+				{
+					pieces[piece.color][piece.name].Recycle(piece);
+					piece = pieces[(Color)data.playerID][data.name].Get(new Vector3(to.x, to.y));
+				}
+				#endregion
+
+				#region Khôi phục lại quân đối phương bị bắt nếu có
+				if (data.capturedName != null)
+				{
+					if (data.enpassantCapturedIndex != null)
+					{
+						mailBox[to.x][to.y] = null;
+						var index = data.enpassantCapturedIndex.Value.ToMailBoxIndex();
+						mailBox[index.x][index.y] = pieces[(Color)(1 - data.playerID)][PieceName.Pawn].Get(index.ToVector3());
+					}
+					else mailBox[to.x][to.y] = pieces[(Color)(1 - data.playerID)][data.capturedName.Value].Get(to.ToVector3());
+				}
+				else mailBox[to.x][to.y] = null;
+				#endregion
+
+				// Nếu là AI hoặc Remote thì tô màu đích đến trước khi di chuyển quân cờ
+				if (!TurnManager.instance.CurrentPlayerIsLocalHuman()) moveTarget.position = from.ToVector3();
+				await piece.transform.Move(from.ToVector3(), pieceMoveSpeed);
+				mailBox[from.x][from.y] = piece;
+
+				if (data.castling != Core.MoveData.Castling.None)
+				{
+					var r = Core.CASTLING_ROOK_MOVEMENTS[(Color)data.playerID][data.castling];
+					var rook = mailBox[r.m_to.x][r.m_to.y];
+					mailBox[r.m_to.x][r.m_to.y] = null;
+					await rook.transform.Move(from.ToVector3(), pieceMoveSpeed);
+					mailBox[r.m_from.x][r.m_from.y] = rook;
+				}
 				#endregion
 			}
 		}

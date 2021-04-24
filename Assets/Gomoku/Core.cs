@@ -4,24 +4,21 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
-using System.Runtime.Serialization;
 using UnityEngine;
 
 
 namespace BoardGames.Gomoku
 {
-	public enum Symbol : byte
+	public enum Symbol
 	{
 		O = 0, X = 1
 	}
 
 
 
-	[DataContract]
 	public sealed class Core
 	{
 		#region Khai báo dữ liệu và khởi tạo
-		[DataMember]
 		private readonly Symbol?[][] mailBox;
 		public Rect rect { get; private set; }
 
@@ -29,27 +26,6 @@ namespace BoardGames.Gomoku
 		/// Số ô trống trên bàn cờ.
 		/// </summary>
 		private int emptyCells;
-
-
-		[OnSerialized]
-		private void OnSerialized(StreamingContext context)
-		{
-			if (state != State.Normal) throw new InvalidOperationException("Bàn cờ đã kết thúc, không thể lưu json !");
-		}
-
-
-		[OnDeserialized]
-		private void OnDeserialized(StreamingContext context)
-		{
-			if (state != State.Normal) throw new InvalidOperationException("Không thể load bàn cờ đã kết thúc từ json !");
-			rect = new Rect(0, 0, mailBox.Length - 1, mailBox[0].Length - 1);
-			for (int x = 0; x < rect.width; ++x)
-				for (int y = 0; y < rect.height; ++y) emptyCells += mailBox[x][y] == null ? 1 : 0;
-		}
-
-
-		[JsonConstructor]
-		private Core() { }
 
 
 		public Core(Vector2Int size)
@@ -91,7 +67,6 @@ namespace BoardGames.Gomoku
 		{
 			Normal, O_Win, X_Win, Draw
 		}
-		[DataMember]
 		public State state { get; private set; }
 		public readonly IReadOnlyList<Vector3[]> winLines = new List<Vector3[]>();
 		private static readonly Vector3 WINLINE_DELTA = new Vector3(0.5f, 0.5f);
@@ -150,14 +125,14 @@ namespace BoardGames.Gomoku
 			public readonly Vector2Int index;
 
 
-			public MoveData(Symbol symbol, Vector2Int index)
+			public MoveData(in Symbol symbol, in Vector2Int index)
 			{
 				playerID = (int)symbol;
 				this.index = index;
 			}
 
 
-			public override string ToString() => $"({(Symbol)playerID}, {index})";
+			public override string ToString() => $"{{{(Symbol)playerID}, {index}}}, ";
 		}
 
 
@@ -266,6 +241,46 @@ namespace BoardGames.Gomoku
 				if (oldState != State.Normal) onStateChanged?.Invoke(state);
 				#endregion
 				#endregion
+			}
+		}
+		#endregion
+
+
+		#region Json
+		private sealed class JsonConverterForCore : JsonConverter<Core>
+		{
+			public override Core ReadJson(JsonReader reader, Type objectType, Core existingValue, bool hasExistingValue, JsonSerializer serializer)
+				=> new Core(serializer.Deserialize<Symbol?[][]>(reader));
+
+
+			public override void WriteJson(JsonWriter writer, Core value, JsonSerializer serializer)
+				=> serializer.Serialize(writer, value.mailBox);
+		}
+
+
+		private sealed class JsonConverterForMoveData : JsonConverter<MoveData>
+		{
+			public override MoveData ReadJson(JsonReader reader, Type objectType, MoveData existingValue, bool hasExistingValue, JsonSerializer serializer)
+			{
+				reader.Read(); // nameof
+				var symbol = (Symbol)reader.ReadAsInt32().Value;
+				reader.Read(); // nameof
+				reader.Read();
+				var index = serializer.Deserialize<Vector2Int>(reader);
+				reader.Read(); // }
+
+				return new MoveData(symbol, index);
+			}
+
+
+			public override void WriteJson(JsonWriter writer, MoveData value, JsonSerializer serializer)
+			{
+				writer.WriteStartObject();
+				writer.WritePropertyName(nameof(value.playerID));
+				writer.WriteValue(value.playerID);
+				writer.WritePropertyName(nameof(value.index));
+				serializer.Serialize(writer, value.index);
+				writer.WriteEndObject();
 			}
 		}
 		#endregion
