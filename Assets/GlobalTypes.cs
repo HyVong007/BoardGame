@@ -1,6 +1,6 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using BoardGames.Databases;
+using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
-using Photon.Pun;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -289,35 +289,18 @@ namespace BoardGames
 
 		public static bool CurrentPlayerIsLocalHuman(this TurnManager t)
 			=> t is OfflineTurnManager ? (t as OfflineTurnManager).IsHumanPlayer(t.currentPlayerID)
-
-			// Test
-			: PhotonNetwork.IsMasterClient ^ t.currentPlayerID == 1;
-		//: TablePlayer.Find(t.currentPlayerID).user == User.local;
+			: Table.current?.FindPlayer(t.currentPlayerID).user == User.local;
 
 
 		#region Json
-		private static readonly object lock_json = new object();
-
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static string ToJson(this object obj) => JsonConvert.SerializeObject(obj);
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static string ToJson(this object obj)
-		{
-			lock (lock_json) { return JsonConvert.SerializeObject(obj); }
-		}
-
+		public static T FromJson<T>(this string json) => JsonConvert.DeserializeObject<T>(json);
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static T FromJson<T>(this string json)
-		{
-			lock (lock_json) { return JsonConvert.DeserializeObject<T>(json); }
-		}
-
-
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static object FromJson(this string json, Type type)
-		{
-			lock (lock_json) { return JsonConvert.DeserializeObject(json, type); }
-		}
+		public static object FromJson(this string json, Type type) => JsonConvert.DeserializeObject(json, type);
 		#endregion
 
 

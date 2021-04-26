@@ -19,9 +19,9 @@ namespace BoardGames
 	public enum Request : byte
 	{
 		/// <summary>
-		/// Cầu hòa
+		/// Kết thúc trò chơi: cầu hòa hoặc kết thúc trong cờ vây
 		/// </summary>
-		DRAW,
+		END,
 		/// <summary>
 		/// Xin đi lại
 		/// </summary>
@@ -59,7 +59,6 @@ namespace BoardGames
 		UniTask OnPlayerMove(IMoveData moveData, History.Mode mode);
 		/// <summary>
 		/// Nhận được yêu cầu và đợi phản hồi. Người gửi yêu cầu sẽ không nhận yêu cầu<para/>
-		/// Có thể gửi yêu cầu bất cứ khi nào khi đang chơi game không cần đợi đến lượt mình
 		/// </summary>
 		/// <returns><see langword="true"/> nếu chấp nhận yêu cầu</returns>
 		UniTask<bool> OnReceiveRequest(int playerID, Request request);
@@ -70,11 +69,36 @@ namespace BoardGames
 		/// <param name="playerID">Người chơi mới thoát</param>
 		void OnPlayerQuit(int playerID);
 		/// <summary>
-		/// Game kết thúc vì trạng thái game kết thúc hoặc chỉ còn lại 1 người chơi<br/>
+		/// Game kết thúc vì trạng thái game kết thúc hoặc client thoát hoặc chỉ còn lại 1 người chơi<br/>
 		/// Đặc biệt: nếu số lượt của bàn chơi đạt đến tối đa (<see cref="int.MaxValue"/>) thì sẽ kết thúc bàn chơi. Mỗi trò chơi tự quyết định kết quả.<para/>
 		/// Đợi <see cref="OnPlayerMove(IMoveData, History.Mode)"/> kết thúc sau đó mới gọi
 		/// </summary>
 		void OnGameOver();
+	}
+
+
+
+	public static class EventCode
+	{
+		public const byte
+		Ready = 1,
+
+		BeginTurn = 2,
+		DoneBeginTurn = 3,
+
+		TurnTimeOver = 4,
+		PlayerTimeOver = 5,
+
+		Play = 6,
+		DonePlay = 7,
+
+		SendRequest = 8,
+		ResponseRequest = 9,
+		ExecuteRequest = 10,
+		DoneExecutingRequest = 11,
+
+		Quit = 12,
+		GameOver = 13;
 	}
 
 
@@ -224,23 +248,27 @@ namespace BoardGames
 				reader.Read(); // [
 				reader.Read(); // ] or [
 				var undoneMoves = new List<IMoveData[]>();
-				while (reader.TokenType != JsonToken.EndArray)
+
+				lock (tmp)
 				{
-					// [ : quét item: IMoveData[]
 					while (reader.TokenType != JsonToken.EndArray)
 					{
-						// quét item: IMoveData
-						reader.Read(); // ] or {
-						tmp.Clear();
+						// [ : quét item: IMoveData[]
 						while (reader.TokenType != JsonToken.EndArray)
 						{
-							// {
-							tmp.Add(serializer.Deserialize(reader, type) as IMoveData);
+							// quét item: IMoveData
 							reader.Read(); // ] or {
+							tmp.Clear();
+							while (reader.TokenType != JsonToken.EndArray)
+							{
+								// {
+								tmp.Add(serializer.Deserialize(reader, type) as IMoveData);
+								reader.Read(); // ] or {
+							}
+							undoneMoves.Add(tmp.ToArray());
 						}
-						undoneMoves.Add(tmp.ToArray());
+						reader.Read(); // ] or [
 					}
-					reader.Read(); // ] or [
 				}
 				#endregion
 
@@ -299,15 +327,25 @@ namespace BoardGames
 		public void AddListener(ITurnListener listener) => (instance.listeners as List<ITurnListener>).Add(listener);
 
 
-		/// <summary>
-		/// gameObject có thể bị Destroy
-		/// </summary>
 		protected void Awake()
 		{
 			instance = instance ? throw new Exception() : this;
-			Config config;
-			try { config = "TURNBASE_CONFIG".GetValue<Config>(); } catch { Destroy(gameObject); return; }
+			var config = "TURNBASE_CONFIG".GetValue<Config>();
 			history = new History();
+		}
+
+
+		/// <summary>
+		/// Khởi động Turn Manager: bắt đầu chơi
+		/// </summary>
+		public async void StartPlaying()
+		{
+			if (turn > 0)
+				throw new InvalidOperationException("Không thể Start game nữa vì TurnManager đã khởi động rồi !");
+
+			// Đảm bảo scene đã khởi tạo xong hết: tất cả Awake() và Start() đã gọi xong.
+			await UniTask.Yield();
+			BeginTurn();
 		}
 
 
@@ -327,7 +365,8 @@ namespace BoardGames
 		/// Gửi yêu cầu cho tất cả người chơi khác (ngoại trừ người chơi đã gửi yêu cầu)<para/>
 		/// Chú ý với: Đảm bảo bắt đầu tuần tự các <see cref="ITurnListener.OnReceiveRequest(int, Request)"/> sau đó đợi tất cả quá trình <see langword="async"/> kết thúc<br/>
 		/// Ví dụ: ... <see langword="await"/> <see cref="UniTask.WhenAll(IEnumerable{UniTask})"/>  ...<para/>
-		/// Tương tự như trên, đảm bảo bắt đầu tuần tự các <see cref="ITurnListener.OnPlayerMove(IMoveData, History.Mode)"/> nếu Undo/Redo
+		/// Tương tự như trên, đảm bảo bắt đầu tuần tự các <see cref="ITurnListener.OnPlayerMove(IMoveData, History.Mode)"/> nếu Undo/Redo<br/>
+		/// Nếu undo/redo: khôi phục <see cref="ElapsedPlayerTime(int)"/> của người chơi hiện tại và reset <see cref="elapsedTurnTime"/> = 0
 		/// </summary>
 		/// <returns><see langword="true"/> nếu tất cả người chơi khác chấp nhận yêu cầu</returns>
 		public abstract UniTask<bool> SendRequest(Request request);

@@ -46,7 +46,6 @@ namespace BoardGames
 		private async new void Awake()
 		{
 			base.Awake();
-			if (!gameObject.activeSelf) return;
 			Config config = null;
 
 			#region Load SaveData
@@ -147,7 +146,7 @@ namespace BoardGames
 		{
 			switch (request)
 			{
-				case Request.DRAW:
+				case Request.END:
 					foreach (var listener in listeners) listener.OnGameOver();
 					Destroy(gameObject);
 					break;
@@ -155,11 +154,17 @@ namespace BoardGames
 				case Request.UNDO:
 					history.Undo(currentPlayerID);
 					await ExecuteMoveQueue();
+					elapsedPlayerTimes[currentPlayerID] -= elapsedTurnTime;
+					cacheElapsedTurnTime = 0;
+					RefreshTime();
 					break;
 
 				case Request.REDO:
 					history.Redo(currentPlayerID);
 					await ExecuteMoveQueue();
+					elapsedPlayerTimes[currentPlayerID] -= elapsedTurnTime;
+					cacheElapsedTurnTime = 0;
+					RefreshTime();
 					break;
 			}
 
@@ -213,6 +218,14 @@ namespace BoardGames
 					elapsedPlayerTimes[currentPlayerID] = Time.time - playerStartTimes[currentPlayerID];
 				}
 			}
+		}
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void RefreshTime()
+		{
+			ΔcountTime = false;
+			countTime = true;
 		}
 		#endregion
 

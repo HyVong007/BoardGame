@@ -87,6 +87,11 @@ namespace BoardGames.Gomoku
 					  SceneManager.LoadScene("Test");
 				  };
 			}
+			else
+			{
+				var ui = OnlineChessTableUI.instance;
+				ui.SetPlayerSprite(playerID_sprite);
+			}
 		}
 
 
@@ -145,7 +150,7 @@ namespace BoardGames.Gomoku
 
 		public async UniTask<bool> OnReceiveRequest(int playerID, Request request)
 		{
-			throw new NotImplementedException();
+			return true;
 		}
 
 

@@ -1,5 +1,4 @@
 ﻿using Cysharp.Threading.Tasks;
-using System;
 using System.Collections.Generic;
 
 
@@ -22,7 +21,7 @@ namespace BoardGames.Databases
 
 		public int chair { get; set; }
 
-		public IReadOnlyList<TablePlayer> players { get; set; }
+		public readonly IReadOnlyList<TablePlayer> players = new List<TablePlayer>();
 
 		public TablePlayer host { get; set; }
 
@@ -33,6 +32,38 @@ namespace BoardGames.Databases
 		public bool isPlaying { get; set; }
 
 
-		public static async UniTask<Table> Find(MiniGame game, int tableLocalID) => throw new NotImplementedException();
+
+
+
+
+
+		public TablePlayer FindPlayer(int playerID)
+		{
+			foreach (var player in players) if (player.id == playerID) return player;
+			return null;
+		}
+
+
+		// test
+		private static readonly List<Table> tables = new List<Table>();
+		public Table()
+		{
+			tables.Add(this);
+		}
+
+
+		/// <summary>
+		/// Bàn đang chơi hiện tại của 1 client<para/>
+		/// Vào bàn thì cài, ra khỏi bàn thì reset <see langword="null"/>
+		/// </summary>
+		public static Table current { get; set; }
+
+		public static async UniTask<Table> FindTable(MiniGame game, int tableLocalID)
+		{
+			// test
+			foreach (var table in tables)
+				if (table.game == game && table.localID == tableLocalID) return table;
+			return null;
+		}
 	}
 }

@@ -82,10 +82,11 @@ namespace BoardGames
 
 
 		#region Listener
-		private readonly Dictionary<int, Sprite> playerID_sprite = new Dictionary<int, Sprite>();
+		private readonly IReadOnlyDictionary<int, Sprite> playerID_sprite = new Dictionary<int, Sprite>();
 		public void SetPlayerSprites(IDictionary<int, Sprite> playerID_sprite)
 		{
-			foreach (var kvp in playerID_sprite) this.playerID_sprite[kvp.Key] = kvp.Value;
+			var dict = this.playerID_sprite as Dictionary<int, Sprite>;
+			foreach (var kvp in playerID_sprite) dict[kvp.Key] = kvp.Value;
 		}
 
 

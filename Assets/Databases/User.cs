@@ -1,4 +1,6 @@
-﻿
+﻿using UnityEngine;
+
+
 namespace BoardGames.Databases
 {
 	public sealed class User
@@ -11,11 +13,11 @@ namespace BoardGames.Databases
 		}
 		public Sex sex { get; set; }
 
+		public Sprite avatar;
 
+		public string name { get; set; }
 
-
-
-
+		public int money { get; set; }
 
 
 

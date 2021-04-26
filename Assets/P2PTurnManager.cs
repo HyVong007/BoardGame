@@ -1,10 +1,10 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using BoardGames.Databases;
+using Cysharp.Threading.Tasks;
 using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 
 namespace BoardGames
@@ -17,21 +17,11 @@ namespace BoardGames
 		}
 
 
-		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-		private static void Init()
-		{
-
-		}
-
-
 		private new void Awake()
 		{
 			base.Awake();
-			if (!gameObject.activeSelf) return;
-
+			PhotonNetwork.NetworkingClient.EventReceived += OnPhotonEvent;
 			var config = "TURNBASE_CONFIG".GetValue<Config>();
-			PhotonNetwork.AddCallbackTarget(photonPun = new PhotonPun(this));
-			PhotonNetwork.NetworkingClient.LoadBalancingPeer.ReuseEventInstance = true;
 			playerIDGenerator = PlayerIDGenerator(2);
 			history.execute += (data, mode) => moveQueues.Enqueue((data, mode));
 		}
@@ -39,47 +29,11 @@ namespace BoardGames
 
 		private void OnDisable()
 		{
-			PhotonNetwork.RemoveCallbackTarget(photonPun);
+			PhotonNetwork.NetworkingClient.EventReceived -= OnPhotonEvent;
 		}
 
 
-		#region Network Time
-		private float maxTurnTime;
-		private readonly Dictionary<int, float> maxPlayerTimes = new Dictionary<int, float>();
-
-
-		public override sealed float remainTurnTime => maxTurnTime - elapsedTurnTime;
-
-
-		public override sealed float RemainPlayerTime(int playerID) => maxPlayerTimes[playerID] - ElapsedPlayerTime(playerID);
-
-
-		public override float elapsedTurnTime
-		{
-			get
-			{
-				return 0;
-			}
-		}
-
-		public override float ElapsedPlayerTime(int playerID)
-		{
-			throw new NotImplementedException();
-		}
-		#endregion
-
-
-		#region currentPlayerID
-		public override int currentPlayerID => playerIDGenerator.Current;
-
-		private static IEnumerator<int> PlayerIDGenerator(int maxPlayer)
-		{
-			while (true) for (int i = 0; i < maxPlayer; ++i) yield return i;
-		}
-		private IEnumerator<int> playerIDGenerator;
-		#endregion
-
-
+		#region Turn Manager
 		protected override void BeginTurn()
 		{
 #if UNITY_EDITOR
@@ -95,24 +49,33 @@ namespace BoardGames
 			foreach (var listener in listeners) listener.OnTurnBegin();
 
 			if (!PhotonNetwork.IsMasterClient)
-				PhotonNetwork.RaiseEvent((byte)EventCode.DoneBeginTurn, null,
+			{
+				sendHash.Clear();
+				sendHash[HashKey.Turn] = turn;
+				sendHash[HashKey.PlayerID] = TablePlayer.local.id;
+				PhotonNetwork.RaiseEvent(EventCode.DoneBeginTurn, sendHash,
 					new RaiseEventOptions { Receivers = ReceiverGroup.MasterClient, CachingOption = EventCaching.AddToRoomCache },
 					SendOptions.SendReliable);
+			}
 		}
 
 
-		private readonly Queue<(IMoveData data, History.Mode mode)> moveQueues
-			= new Queue<(IMoveData data, History.Mode mode)>();
+		private readonly Queue<(IMoveData data, History.Mode mode)> moveQueues = new Queue<(IMoveData data, History.Mode mode)>();
 		public override async UniTask Play(IMoveData data, bool endTurn)
 		{
 			if (lastEventCode != EventCode.Play)
-				PhotonNetwork.RaiseEvent((byte)EventCode.Play,
-				new Hashtable { ["DATA"] = data, ["END_TURN"] = endTurn },
+			{
+				sendHash.Clear();
+				sendHash[HashKey.Turn] = turn;
+				//sendHash[HashKey.Order] = ...
+				sendHash[HashKey.PlayerID] = TablePlayer.local.id;
+				sendHash[HashKey.Data] = data;
+				sendHash[HashKey.IsEndTurn] = endTurn;
+				PhotonNetwork.RaiseEvent(EventCode.Play, sendHash,
 				  new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache }
 				  , SendOptions.SendReliable);
+			}
 			else lastEventCode = null;
-
-			// Không cần đợi phản hồi
 
 			if (data == null)
 			{
@@ -122,34 +85,119 @@ namespace BoardGames
 
 			history.Play(data);
 			await ExecuteMoveQueue();
-			if (endTurn) FinishTurn();
+			if (!PhotonNetwork.IsMasterClient)
+			{
+				sendHash.Clear();
+				sendHash[HashKey.Turn] = turn;
+				//sendHash[HashKey.Order]= ...
+				sendHash[HashKey.PlayerID] = TablePlayer.local.id;
+				PhotonNetwork.RaiseEvent(EventCode.DonePlay, sendHash,
+				  new RaiseEventOptions { Receivers = ReceiverGroup.MasterClient, CachingOption = EventCaching.AddToRoomCache }
+				  , SendOptions.SendReliable);
+			}
+
+			if (endTurn || IsGameOver()) FinishTurn();
 		}
 
 
 		public override void Quit()
 		{
-			//PhotonNetwork.RaiseEvent((byte)EventCode.PlayerQuit, null,
-			//	new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache }
-			//	, SendOptions.SendReliable);
+			sendHash.Clear();
+			sendHash[HashKey.Turn] = turn;
+			sendHash[HashKey.PlayerID] = TablePlayer.local.id;
+			PhotonNetwork.RaiseEvent(EventCode.Quit, sendHash,
+				  new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache }
+				  , SendOptions.SendReliable);
 
 			foreach (var listener in listeners) listener.OnGameOver();
 			Destroy(gameObject);
 		}
 
 
+		#region Request
+		private int requestOrder;
+		private bool? resultRequest;
+
 		public override async UniTask<bool> SendRequest(Request request)
 		{
-			//PhotonNetwork.RaiseEvent((byte)EventCode.Request, (byte)request,
-			//	new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache }
-			//	, SendOptions.SendReliable);
+			sendHash.Clear();
+			sendHash[HashKey.Turn] = turn;
+			sendHash[HashKey.Order] = requestOrder;
+			sendHash[HashKey.PlayerID] = TablePlayer.local.id;
+			sendHash[HashKey.Data] = request;
 
+			// Gửi yêu cầu
+			resultRequest = null;
+			int sendTurn = turn;
+			PhotonNetwork.RaiseEvent(EventCode.SendRequest, sendHash,
+				  new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache }
+				  , SendOptions.SendReliable);
 
+			// Đợi kết quả phản hồi (trong khi turn hiện tại chưa kết thúc)
+			await UniTask.WaitWhile(() => sendTurn == turn && resultRequest == null);
+			if (sendTurn != turn || resultRequest != true)
+			{
+				checked { ++requestOrder; }
+				return false;
+			}
+
+			// Gửi thông báo ExecuteRequest cho người chơi khác
+			sendHash.Clear();
+			sendHash[HashKey.Turn] = turn;
+			sendHash[HashKey.Order] = requestOrder;
+			sendHash[HashKey.PlayerID] = TablePlayer.local.id;
+			sendHash[HashKey.Data] = request;
+			PhotonNetwork.RaiseEvent(EventCode.ExecuteRequest, sendHash,
+			new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache }
+			, SendOptions.SendReliable);
+
+			// Thực thi yêu cầu
+			await ExecuteRequest(request);
+			checked { ++requestOrder; }
 			return true;
 		}
 
 
+		private async UniTask ExecuteRequest(Request request)
+		{
+			switch (request)
+			{
+				case Request.END: throw new NotImplementedException();
+				case Request.REDO: throw new NotImplementedException();
+				case Request.UNDO:
+
+					history.Undo(currentPlayerID);
+					await ExecuteMoveQueue();
+					break;
+			}
+
+			// Gửi phản hồi DoneExecutingRequest
+			if (!PhotonNetwork.IsMasterClient)
+			{
+				sendHash.Clear();
+				sendHash[HashKey.Turn] = turn;
+				sendHash[HashKey.Order] = requestOrder;
+				sendHash[HashKey.PlayerID] = TablePlayer.local.id;
+				sendHash[HashKey.Data] = request;
+				PhotonNetwork.RaiseEvent(EventCode.DoneExecutingRequest, sendHash,
+				new RaiseEventOptions { Receivers = ReceiverGroup.MasterClient, CachingOption = EventCaching.AddToRoomCache }
+				, SendOptions.SendReliable);
+			}
+
+			// Nếu GameOver thì kết thúc !
+			if (IsGameOver())
+			{
+				FinishTurn();
+				return;
+			}
+		}
+		#endregion
+
+
 		protected override void FinishTurn()
 		{
+			requestOrder = 0;
+
 			foreach (var listener in listeners) listener.OnTurnEnd(false); // test
 			if (IsGameOver())
 			{
@@ -173,168 +221,110 @@ namespace BoardGames
 		}
 
 
+		#region currentPlayerID
+		public override int currentPlayerID => playerIDGenerator.Current;
 
-		private enum EventCode : byte
+		private static IEnumerator<int> PlayerIDGenerator(int maxPlayer)
 		{
-			StartGame = 1,
-			Play,
-			Request,
-			ResponseRequest,
-			PlayerQuit,
-			TurnTimeOver,
-			PlayerTimeOver,
-			DoneBeginTurn
+			while (true) for (int i = 0; i < maxPlayer; ++i) yield return i;
+		}
+		private IEnumerator<int> playerIDGenerator;
+		#endregion
+
+
+		#region Time
+		private float maxTurnTime;
+		private readonly Dictionary<int, float> maxPlayerTimes = new Dictionary<int, float>();
+
+
+		public override sealed float remainTurnTime => maxTurnTime - elapsedTurnTime;
+
+
+		public override sealed float RemainPlayerTime(int playerID) => maxPlayerTimes[playerID] - ElapsedPlayerTime(playerID);
+
+
+		public override float elapsedTurnTime
+		{
+			get
+			{
+				return 0;
+			}
 		}
 
-		private EventCode? lastEventCode;
 
-
-
-		private sealed class PhotonPun : IConnectionCallbacks, IMatchmakingCallbacks, IInRoomCallbacks, IOnEventCallback
+		public override float ElapsedPlayerTime(int playerID)
 		{
-			private readonly P2PTurnManager p2p;
-			public PhotonPun(P2PTurnManager p2p) => this.p2p = p2p;
+			return 0;
+		}
+		#endregion
+		#endregion
 
 
-			private const string PREFIX = "P2P TURN MANAGER: ";
+		private byte? lastEventCode;
+		private readonly Hashtable sendHash = new Hashtable();
+		public static class HashKey
+		{
+			public const byte
+			Turn = 0,
+			Order = 1,
+			PlayerID = 2,
+			IsEndTurn = 3,
+			Data = 4;
+		}
+		private readonly List<UniTask<bool>> requestResults = new List<UniTask<bool>>();
 
 
-			#region Connection Callbacks
-			public void OnConnected()
+		private async void OnPhotonEvent(EventData photonEvent)
+		{
+			if (photonEvent.Code >= 200) return;
+			var data = photonEvent.CustomData as Hashtable;
+			switch (lastEventCode = photonEvent.Code)
 			{
-				print($"{PREFIX}Connected");
-			}
+				case EventCode.DoneBeginTurn: break;
+				case EventCode.DonePlay: break;
+				case EventCode.GameOver: break;
+				case EventCode.Play:
+					await Play(data[HashKey.Data] as IMoveData, (bool)data[HashKey.IsEndTurn]);
+					break;
 
+				case EventCode.PlayerTimeOver: break;
+				case EventCode.TurnTimeOver: break;
+				case EventCode.Quit:
+					// game cờ 2 người
+					foreach (var listener in listeners) listener.OnGameOver();
+					Destroy(gameObject);
+					break;
 
-			public void OnConnectedToMaster()
-			{
-				print($"{PREFIX}Connected To Master");
-				PhotonNetwork.JoinOrCreateRoom("Tam", null, null);
-			}
+				case EventCode.SendRequest:
+					{
+						requestResults.Clear();
+						foreach (var listener in listeners)
+							requestResults.Add(listener.OnReceiveRequest((int)data[HashKey.PlayerID], (Request)data[HashKey.Data]));
+						await UniTask.WhenAll(requestResults);
 
+						bool result = true;
+						foreach (var task in requestResults) result &= await task;
+						sendHash.Clear();
+						sendHash[HashKey.Turn] = turn;
+						sendHash[HashKey.Order] = requestOrder;
+						sendHash[HashKey.PlayerID] = TablePlayer.local.id;
+						sendHash[HashKey.Data] = result;
+						PhotonNetwork.RaiseEvent(EventCode.ResponseRequest, sendHash,
+							new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache },
+							SendOptions.SendReliable);
+					}
+					break;
 
-			public void OnCustomAuthenticationFailed(string debugMessage)
-			{
-				print($"{PREFIX}Custom Authentication Failed: {debugMessage}");
-			}
+				case EventCode.ResponseRequest:
+					resultRequest = (bool)data[HashKey.Data];
+					break;
 
+				case EventCode.ExecuteRequest:
+					await ExecuteRequest((Request)data[HashKey.Data]);
+					break;
 
-			public void OnCustomAuthenticationResponse(Dictionary<string, object> data)
-			{
-
-			}
-
-
-			public void OnDisconnected(DisconnectCause cause)
-			{
-				print($"{PREFIX}Disconnected: {cause}");
-			}
-
-
-			public void OnRegionListReceived(RegionHandler regionHandler)
-			{
-			}
-			#endregion
-
-
-			#region Matchmaking Callbacks
-			public void OnCreatedRoom()
-			{
-				print($"{PREFIX}Created Room");
-			}
-
-			public void OnCreateRoomFailed(short returnCode, string message)
-			{
-				print($"{PREFIX}Create Room Failed: {returnCode}, {message}");
-			}
-
-			public void OnFriendListUpdate(List<FriendInfo> friendList)
-			{
-			}
-
-			public void OnJoinedRoom()
-			{
-				print($"{PREFIX}Joined Room");
-			}
-
-			public void OnJoinRandomFailed(short returnCode, string message)
-			{
-				print($"{PREFIX}Join Random Failed: {returnCode}, {message}");
-			}
-
-			public void OnJoinRoomFailed(short returnCode, string message)
-			{
-				print($"{PREFIX}Join Room Failed: {returnCode}, {message}");
-			}
-
-			public void OnLeftRoom()
-			{
-				print($"{PREFIX}Left Room");
-			}
-			#endregion
-
-
-			#region InRoom Callbacks
-			public void OnMasterClientSwitched(Player newMasterClient)
-			{
-			}
-
-
-			public async void OnPlayerEnteredRoom(Player newPlayer)
-			{
-				// Test
-				await UniTask.Yield(PlayerLoopTiming.LastUpdate);
-				if (PhotonNetwork.CurrentRoom.PlayerCount == 2 && PhotonNetwork.IsMasterClient)
-				{
-					p2p.BeginTurn();
-
-					p2p.lastEventCode = null;
-					PhotonNetwork.RaiseEvent((byte)EventCode.StartGame, null,
-						new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache },
-						SendOptions.SendReliable);
-
-					await UniTask.WaitUntil(() => p2p.lastEventCode == EventCode.DoneBeginTurn);
-					print($"{PREFIX} All other clients done turn begin !");
-				}
-			}
-
-
-			public void OnPlayerLeftRoom(Player otherPlayer)
-			{
-			}
-
-			public void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
-			{
-			}
-
-			public void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
-			{
-			}
-			#endregion
-
-
-			public async void OnEvent(EventData photonEvent)
-			{
-				if (photonEvent.Code >= 200) return;
-				switch (p2p.lastEventCode = (EventCode)photonEvent.Code)
-				{
-					case EventCode.StartGame:
-						p2p.BeginTurn();
-						break;
-
-					case EventCode.DoneBeginTurn:
-						break;
-
-					case EventCode.Play:
-						var hash = photonEvent.CustomData as Hashtable;
-						await p2p.Play(hash["DATA"] as IMoveData, (bool)hash["END_TURN"]);
-						break;
-
-
-					default: throw new ArgumentOutOfRangeException();
-				}
+				case EventCode.DoneExecutingRequest: break;
 			}
 		}
-		private PhotonPun photonPun;
 	}
 }

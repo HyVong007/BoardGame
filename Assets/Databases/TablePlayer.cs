@@ -1,4 +1,7 @@
-﻿namespace BoardGames.Databases
+﻿using System;
+
+
+namespace BoardGames.Databases
 {
 	public sealed class TablePlayer
 	{
@@ -8,14 +11,26 @@
 
 		public Table table { get; set; }
 
+		public int betMoney { get; set; }
 
-		public static TablePlayer local { get; set; }
 
 
-		public static TablePlayer Find(int playerID)
+
+
+
+
+
+		private static TablePlayer _local;
+		public static TablePlayer local
 		{
-			// test
-			return local;
+			get
+			{
+				if (Table.current == null) return _local = null;
+				if (_local != null) return _local;
+				foreach (var player in Table.current.players)
+					if (player.user == User.local) return _local = player;
+				throw new Exception();
+			}
 		}
 	}
 }

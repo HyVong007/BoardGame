@@ -174,7 +174,7 @@ namespace BoardGames
 						table = table,
 						user = new User() { sex = (User.Sex)(i % 2) }
 					});
-				table.players = list;
+				//table.players = list;
 				table.host = list[0];
 			}
 			return tables;

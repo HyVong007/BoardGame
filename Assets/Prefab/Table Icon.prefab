@@ -1107,11 +1107,11 @@ GameObject:
   m_Component:
   - component: {fileID: 6222797141801125652}
   - component: {fileID: 6222797141801125656}
-  - component: {fileID: 6222797141801125657}
+  - component: {fileID: 9027787487278488665}
   - component: {fileID: 6222797141801125658}
   - component: {fileID: 6222797141801125659}
   m_Layer: 0
-  m_Name: TableUI
+  m_Name: Table Icon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1158,7 +1158,7 @@ MonoBehaviour:
   _money: {fileID: 6222797142384638120}
   _playingText: {fileID: 6222797140430381658}
   _locker: {fileID: 6222797142274645667}
-  _button: {fileID: 6222797141801125657}
+  <button>k__BackingField: {fileID: 0}
   chairs:
   - {fileID: 6222797141689530921}
   - {fileID: 6222797140424888013}
@@ -1206,7 +1206,7 @@ MonoBehaviour:
     - {fileID: -803138403708184043, guid: ed435d8bc0c865346a5f4da1d70b9abe, type: 3}
     - {fileID: 7491572148825274932, guid: ed435d8bc0c865346a5f4da1d70b9abe, type: 3}
     - {fileID: 0}
---- !u!114 &6222797141801125657
+--- !u!114 &9027787487278488665
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1215,14 +1215,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 6222797141801125653}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 699a8cb216ba5b442b866499b5da491b, type: 3}
+  m_Script: {fileID: 11500000, guid: 5ff83a8c0e149e34abf84829c02cdc4e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_event: 1
-  clickMaxTime: 0.5
-  clickMaxSqrDistance: 100
+  clickMaxTime: 1
+  clickMaxSqrDistance: 2500
   longPressMinTime: 0
   m_dragType: 0
+  _interactable: 1
+  activeColor: {r: 1, g: 1, b: 1, a: 1}
+  disabledColor: {r: 1, g: 1, b: 1, a: 0.5}
 --- !u!222 &6222797141801125658
 CanvasRenderer:
   m_ObjectHideFlags: 0
