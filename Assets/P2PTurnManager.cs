@@ -5,6 +5,8 @@ using Photon.Pun;
 using Photon.Realtime;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using UnityEngine;
 
 
 namespace BoardGames
@@ -13,17 +15,31 @@ namespace BoardGames
 	{
 		public new sealed class Config : TurnManager.Config
 		{
-
+			public int playerCount;
+			public float maxTurnTime, maxPlayerTime;
 		}
 
 
+		private int PLAYER_COUNT;
 		private new void Awake()
 		{
 			base.Awake();
 			PhotonNetwork.NetworkingClient.EventReceived += OnPhotonEvent;
-			var config = "TURNBASE_CONFIG".GetValue<Config>();
-			playerIDGenerator = PlayerIDGenerator(2);
 			history.execute += (data, mode) => moveQueues.Enqueue((data, mode));
+			var config = "TURNBASE_CONFIG".GetValue<Config>();
+#if DEBUG
+			if (config.playerCount < 2 || config.maxTurnTime < 0 || config.maxPlayerTime < config.maxTurnTime)
+				throw new ArgumentOutOfRangeException();
+#endif
+			PLAYER_COUNT = config.playerCount;
+			playerIDGenerator = PlayerIDGenerator(PLAYER_COUNT);
+			for (int i = 0; i < PLAYER_COUNT; ++i)
+			{
+				playerStartTimes[i] = float.MaxValue;
+				elapsedPlayerTimes[i] = 0;
+			}
+			MAX_TURN_TIME = config.maxTurnTime;
+			MAX_PLAYER_TIME = config.maxPlayerTime;
 		}
 
 
@@ -45,26 +61,29 @@ namespace BoardGames
 			catch { return; }
 #endif
 			checked { ++turn; }
-			playerIDGenerator.MoveNext();
-			foreach (var listener in listeners) listener.OnTurnBegin();
 
-			if (!PhotonNetwork.IsMasterClient)
-			{
-				sendHash.Clear();
-				sendHash[HashKey.Turn] = turn;
-				sendHash[HashKey.PlayerID] = TablePlayer.local.id;
-				PhotonNetwork.RaiseEvent(EventCode.DoneBeginTurn, sendHash,
-					new RaiseEventOptions { Receivers = ReceiverGroup.MasterClient, CachingOption = EventCaching.AddToRoomCache },
-					SendOptions.SendReliable);
-			}
+			// Tìm người chơi tiếp theo còn trong bàn (người chơi chưa hết thời gian)
+			do playerIDGenerator.MoveNext();
+			while (elapsedPlayerTimes[currentPlayerID] >= MAX_PLAYER_TIME);
+
+			cacheElapsedTurnTime = 0;
+			countTime = true;
+			foreach (var listener in listeners) listener.OnTurnBegin();
 		}
 
 
 		private readonly Queue<(IMoveData data, History.Mode mode)> moveQueues = new Queue<(IMoveData data, History.Mode mode)>();
+		private int reportCount_DonePlay;
 		public override async UniTask Play(IMoveData data, bool endTurn)
 		{
-			if (lastEventCode != EventCode.Play)
+			if (PhotonNetwork.IsMasterClient)
 			{
+				#region Master điều phối Play cho tất cả client khác
+				if (!countTime) return;
+
+				// Gửi tin Play cho other
+				countTime = false;
+				reportCount_DonePlay = 0;
 				sendHash.Clear();
 				sendHash[HashKey.Turn] = turn;
 				//sendHash[HashKey.Order] = ...
@@ -74,18 +93,53 @@ namespace BoardGames
 				PhotonNetwork.RaiseEvent(EventCode.Play, sendHash,
 				  new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache }
 				  , SendOptions.SendReliable);
-			}
-			else lastEventCode = null;
 
-			if (data == null)
+				// Play
+				if (data != null)
+				{
+					history.Play(data);
+					await ExecuteMoveQueue();
+				}
+
+				// Đợi other play xong
+				await UniTask.WaitWhile(() => reportCount_DonePlay < PLAYER_COUNT - 1);
+				countTime = true;
+
+				// Kết thúc ?
+				if (data == null || endTurn || IsGameOver()) FinishTurn();
+				#endregion
+			}
+			else if (lastEventCode != EventCode.Play)
 			{
-				FinishTurn();
-				return;
+				// Người chơi gửi tin nhắn cho Master
+				sendHash.Clear();
+				sendHash[HashKey.Turn] = turn;
+				//sendHash[HashKey.Order] = ...
+				sendHash[HashKey.PlayerID] = TablePlayer.local.id;
+				sendHash[HashKey.Data] = data;
+				sendHash[HashKey.IsEndTurn] = endTurn;
+				PhotonNetwork.RaiseEvent(EventCode.Play, sendHash,
+				  new RaiseEventOptions { Receivers = ReceiverGroup.MasterClient, CachingOption = EventCaching.AddToRoomCache }
+				  , SendOptions.SendReliable);
+			}
+			else
+			{
+				lastEventCode = null;
+				if (data == null)
+				{
+					ReportDone();
+					FinishTurn();
+					return;
+				}
+
+				history.Play(data);
+				await ExecuteMoveQueue();
+				ReportDone();
+				if (endTurn || IsGameOver()) FinishTurn();
 			}
 
-			history.Play(data);
-			await ExecuteMoveQueue();
-			if (!PhotonNetwork.IsMasterClient)
+
+			void ReportDone()
 			{
 				sendHash.Clear();
 				sendHash[HashKey.Turn] = turn;
@@ -95,13 +149,12 @@ namespace BoardGames
 				  new RaiseEventOptions { Receivers = ReceiverGroup.MasterClient, CachingOption = EventCaching.AddToRoomCache }
 				  , SendOptions.SendReliable);
 			}
-
-			if (endTurn || IsGameOver()) FinishTurn();
 		}
 
 
 		public override void Quit()
 		{
+			countTime = false;
 			sendHash.Clear();
 			sendHash[HashKey.Turn] = turn;
 			sendHash[HashKey.PlayerID] = TablePlayer.local.id;
@@ -110,6 +163,7 @@ namespace BoardGames
 				  , SendOptions.SendReliable);
 
 			foreach (var listener in listeners) listener.OnGameOver();
+			gameObject.SetActive(false);
 			Destroy(gameObject);
 		}
 
@@ -134,8 +188,9 @@ namespace BoardGames
 				  , SendOptions.SendReliable);
 
 			// Đợi kết quả phản hồi (trong khi turn hiện tại chưa kết thúc)
-			await UniTask.WaitWhile(() => sendTurn == turn && resultRequest == null);
-			if (sendTurn != turn || resultRequest != true)
+			await UniTask.WaitWhile(()
+				=> resultRequest == null && sendTurn == turn && remainTurnTime > 0);
+			if (resultRequest != true || sendTurn != turn || remainTurnTime <= 0)
 			{
 				checked { ++requestOrder; }
 				return false;
@@ -168,6 +223,9 @@ namespace BoardGames
 
 					history.Undo(currentPlayerID);
 					await ExecuteMoveQueue();
+					elapsedPlayerTimes[currentPlayerID] -= elapsedTurnTime;
+					cacheElapsedTurnTime = 0;
+					RefreshStartTime();
 					break;
 			}
 
@@ -197,20 +255,46 @@ namespace BoardGames
 		protected override void FinishTurn()
 		{
 			requestOrder = 0;
-
-			foreach (var listener in listeners) listener.OnTurnEnd(false); // test
-			if (IsGameOver())
+			countTime = false;
+			if (PhotonNetwork.IsMasterClient)
 			{
-				foreach (var listener in listeners) listener.OnGameOver();
-				Destroy(gameObject);
+				sendHash.Clear();
+				sendHash[HashKey.Turn] = turn;
+				sendHash[HashKey.PlayerID] = currentPlayerID;
+				sendHash[HashKey.ElapseTurnTime] = elapsedTurnTime;
+				sendHash[HashKey.Data] = elapsedPlayerTimes;
+				PhotonNetwork.RaiseEvent(EventCode.UpdateTime, sendHash,
+					new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache },
+					SendOptions.SendReliable);
 			}
-			else UniTask.Yield(PlayerLoopTiming.Update, default).ContinueWith(BeginTurn).Forget();
+
+			bool isTimeOver = remainTurnTime <= 0 || RemainPlayerTime(currentPlayerID) <= 0;
+			foreach (var listener in listeners) listener.OnTurnEnd(isTimeOver);
+			if (!IsGameOver())
+			{
+				// Nếu còn ít nhất 2 người còn thời gian -> trò chơi còn tiếp tục
+				int count = 0;
+				for (int i = 0; i < PLAYER_COUNT; ++i) count += (RemainPlayerTime(i) > 0) ? 1 : 0;
+				if (count >= 2)
+				{
+					// Chỉ có Master mới có thể BeginTurn trực tiếp
+					if (PhotonNetwork.IsMasterClient)
+						UniTask.Yield(PlayerLoopTiming.Update, default).ContinueWith(BeginTurn);
+					return;
+				}
+			}
+
+			foreach (var listener in listeners) listener.OnGameOver();
+			gameObject.SetActive(false);
+			Destroy(gameObject);
 		}
 
 
 		private readonly List<UniTask> moveTasks = new List<UniTask>();
 		private async UniTask ExecuteMoveQueue()
 		{
+			bool isCountingTime = countTime;
+			countTime = false;
 			do
 			{
 				var (data, mode) = moveQueues.Dequeue();
@@ -218,6 +302,7 @@ namespace BoardGames
 				foreach (var listener in listeners) moveTasks.Add(listener.OnPlayerMove(data, mode));
 				await UniTask.WhenAll(moveTasks);
 			} while (moveQueues.Count != 0);
+			countTime = isCountingTime;
 		}
 
 
@@ -233,28 +318,72 @@ namespace BoardGames
 
 
 		#region Time
-		private float maxTurnTime;
-		private readonly Dictionary<int, float> maxPlayerTimes = new Dictionary<int, float>();
-
-
-		public override sealed float remainTurnTime => maxTurnTime - elapsedTurnTime;
-
-
-		public override sealed float RemainPlayerTime(int playerID) => maxPlayerTimes[playerID] - ElapsedPlayerTime(playerID);
-
-
-		public override float elapsedTurnTime
+		private void FixedUpdate()
 		{
-			get
+			if (!PhotonNetwork.IsMasterClient || !countTime) return;
+
+			if (RemainPlayerTime(currentPlayerID) <= 0) FinishTurn();
+			else if (remainTurnTime <= 0)
 			{
-				return 0;
+				if (remainTurnTime < 0)
+				{
+					// Elapse của người chơi hiện tại trừ "độ âm" của lượt
+					countTime = false;
+					elapsedPlayerTimes[currentPlayerID] -= Mathf.Abs(remainTurnTime);
+				}
+
+				FinishTurn();
 			}
 		}
 
 
-		public override float ElapsedPlayerTime(int playerID)
+		private float MAX_TURN_TIME, MAX_PLAYER_TIME;
+		public sealed override float elapsedTurnTime => countTime ? Time.time - turnStartTime : cacheElapsedTurnTime;
+
+
+		public override float remainTurnTime => MAX_TURN_TIME - elapsedTurnTime;
+
+
+		public sealed override float ElapsedPlayerTime(int playerID)
+			=> playerID != currentPlayerID || !countTime ? elapsedPlayerTimes[playerID]
+			: Time.time - playerStartTimes[playerID];
+
+
+		public override float RemainPlayerTime(int playerID) => MAX_PLAYER_TIME - ElapsedPlayerTime(playerID);
+
+
+		private bool ΔcountTime;
+		/// <summary>
+		/// <see langword="true"/> : tiếp tục đếm thời gian, giữ nguyên elapse hiện tại<br/>
+		/// <see langword="false"/> : tạm ngưng, lưu elapse vào cache
+		/// </summary>
+		private bool countTime
 		{
-			return 0;
+			get => ΔcountTime;
+
+			set
+			{
+				if (value == ΔcountTime) return;
+				ΔcountTime = value;
+				if (value)
+				{
+					turnStartTime = Time.time - cacheElapsedTurnTime;
+					playerStartTimes[currentPlayerID] = Time.time - elapsedPlayerTimes[currentPlayerID];
+				}
+				else
+				{
+					cacheElapsedTurnTime = Time.time - turnStartTime;
+					elapsedPlayerTimes[currentPlayerID] = Time.time - playerStartTimes[currentPlayerID];
+				}
+			}
+		}
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void RefreshStartTime()
+		{
+			ΔcountTime = false;
+			countTime = true;
 		}
 		#endregion
 		#endregion
@@ -269,7 +398,8 @@ namespace BoardGames
 			Order = 1,
 			PlayerID = 2,
 			IsEndTurn = 3,
-			Data = 4;
+			ElapseTurnTime = 4,
+			Data = 5;
 		}
 		private readonly List<UniTask<bool>> requestResults = new List<UniTask<bool>>();
 
@@ -280,18 +410,27 @@ namespace BoardGames
 			var data = photonEvent.CustomData as Hashtable;
 			switch (lastEventCode = photonEvent.Code)
 			{
-				case EventCode.DoneBeginTurn: break;
-				case EventCode.DonePlay: break;
 				case EventCode.GameOver: break;
 				case EventCode.Play:
+					// Master xác thực thời gian
+					if (PhotonNetwork.IsMasterClient && (
+						(int)data[HashKey.Turn] != turn
+						// || kiểm tra Order
+						|| (int)data[HashKey.PlayerID] != currentPlayerID
+						|| remainTurnTime <= 0
+						|| RemainPlayerTime(currentPlayerID) <= 0)) break;
+
 					await Play(data[HashKey.Data] as IMoveData, (bool)data[HashKey.IsEndTurn]);
 					break;
 
-				case EventCode.PlayerTimeOver: break;
-				case EventCode.TurnTimeOver: break;
+				case EventCode.DonePlay:
+					++reportCount_DonePlay;
+					break;
+
 				case EventCode.Quit:
 					// game cờ 2 người
 					foreach (var listener in listeners) listener.OnGameOver();
+					gameObject.SetActive(false);
 					Destroy(gameObject);
 					break;
 
@@ -324,6 +463,33 @@ namespace BoardGames
 					break;
 
 				case EventCode.DoneExecutingRequest: break;
+
+				case EventCode.UpdateTime:
+					cacheElapsedTurnTime = (float)data[HashKey.ElapseTurnTime];
+					turnStartTime = Time.time - cacheElapsedTurnTime;
+					var dict = data[HashKey.Data] as IDictionary<int, float>;
+					for (int i = 0; i < PLAYER_COUNT; ++i) elapsedPlayerTimes[i] = dict[i];
+					playerStartTimes[currentPlayerID] = Time.time - elapsedPlayerTimes[currentPlayerID];
+
+					if (!countTime)
+					{
+						// Đã FinishTurn trước đó
+						int count = 0;
+						for (int i = 0; i < PLAYER_COUNT; ++i) count += (RemainPlayerTime(i) > 0) ? 1 : 0;
+						if (count >= 2) BeginTurn();
+						else
+						{
+							foreach (var listener in listeners) listener.OnGameOver();
+							gameObject.SetActive(false);
+							Destroy(gameObject);
+						}
+					}
+					else
+					{
+						FinishTurn();
+						if (gameObject.activeSelf) BeginTurn();
+					}
+					break;
 			}
 		}
 	}

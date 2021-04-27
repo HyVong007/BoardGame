@@ -17,6 +17,8 @@ public class TestGomoku : MonoBehaviour, IMatchmakingCallbacks, IConnectionCallb
 	public SerializableDictionaryBase<Symbol, bool> isHumanPlayer;
 	public bool online;
 
+	public float maxTurnTime, maxPlayerTime;
+
 
 	[Serializable]
 	private sealed class PlayerInfo
@@ -42,7 +44,12 @@ public class TestGomoku : MonoBehaviour, IMatchmakingCallbacks, IConnectionCallb
 		foreach (var kvp in isHumanPlayer) dict[(int)kvp.Key] = kvp.Value;
 		if (!online) "TURNBASE_CONFIG".SetValue(config);
 
-		"TURNBASE_CONFIG".SetValue(new P2PTurnManager.Config());
+		"TURNBASE_CONFIG".SetValue(new P2PTurnManager.Config
+		{
+			playerCount = 2,
+			maxTurnTime = maxTurnTime,
+			maxPlayerTime = maxPlayerTime
+		});
 
 		// test
 		Table.current = new Table { chair = 2, game = MiniGame.Gomoku, localID = 0, isPlaying = true };
@@ -78,6 +85,7 @@ public class TestGomoku : MonoBehaviour, IMatchmakingCallbacks, IConnectionCallb
 	private void Start()
 	{
 		if (!online) return;
+		PhotonNetwork.NetworkingClient.LoadBalancingPeer.ReuseEventInstance = true;
 		PhotonNetwork.ConnectUsingSettings();
 	}
 
@@ -156,7 +164,7 @@ public class TestGomoku : MonoBehaviour, IMatchmakingCallbacks, IConnectionCallb
 	{
 		if (PhotonNetwork.IsMasterClient && PhotonNetwork.CurrentRoom.PlayerCount == 2)
 		{
-			PhotonNetwork.RaiseEvent((byte)BoardGames.EventCode.Ready, null,
+			PhotonNetwork.RaiseEvent(BoardGames.EventCode.Ready, null,
 				new RaiseEventOptions { Receivers = ReceiverGroup.Others, CachingOption = EventCaching.AddToRoomCache },
 				SendOptions.SendReliable);
 
@@ -185,7 +193,7 @@ public class TestGomoku : MonoBehaviour, IMatchmakingCallbacks, IConnectionCallb
 	public void OnEvent(EventData photonEvent)
 	{
 		if (photonEvent.Code >= 200) return;
-		if (photonEvent.Code == (byte)BoardGames.EventCode.Ready)
+		if (photonEvent.Code == BoardGames.EventCode.Ready)
 			TurnManager.instance.StartPlaying();
 	}
 }

@@ -73,8 +73,11 @@ namespace BoardGames
 			var t = TurnManager.instance;
 			if (!t) return;
 
-			var time = new TimeSpan(0, 0, (int)t.elapsedTurnTime);
+			var time = new TimeSpan(0, 0, (int)t.remainTurnTime);
 			remainTurnTime.text = $"{time.Hours:00} : {time.Minutes:00} : {time.Seconds:00}";
+
+			time = new TimeSpan(0, 0, (int)t.RemainPlayerTime(t.currentPlayerID));
+			playerInfos[t.currentPlayerID].remainPlayerTime.text = $"{time.Hours:00} : {time.Minutes:00} : {time.Seconds:00}";
 		}
 
 

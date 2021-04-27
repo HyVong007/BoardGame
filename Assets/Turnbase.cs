@@ -83,22 +83,18 @@ namespace BoardGames
 		public const byte
 		Ready = 1,
 
-		BeginTurn = 2,
-		DoneBeginTurn = 3,
+		UpdateTime = 2,
 
-		TurnTimeOver = 4,
-		PlayerTimeOver = 5,
+		Play = 3,
+		DonePlay = 4,
 
-		Play = 6,
-		DonePlay = 7,
+		SendRequest = 5,
+		ResponseRequest = 6,
+		ExecuteRequest = 7,
+		DoneExecutingRequest = 8,
 
-		SendRequest = 8,
-		ResponseRequest = 9,
-		ExecuteRequest = 10,
-		DoneExecutingRequest = 11,
-
-		Quit = 12,
-		GameOver = 13;
+		Quit = 9,
+		GameOver = 10;
 	}
 
 
@@ -318,6 +314,7 @@ namespace BoardGames
 		[Serializable]
 		public class Config
 		{
+
 		}
 
 

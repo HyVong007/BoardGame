@@ -11,7 +11,6 @@ public class Test : MonoBehaviour, IConnectionCallbacks, IMatchmakingCallbacks, 
 	private void OnEnable()
 	{
 		PhotonNetwork.AddCallbackTarget(this);
-		var e = BoardGames.EventCode.BeginTurn;
 	}
 
 

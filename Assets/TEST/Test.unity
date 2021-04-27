@@ -499,10 +499,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: P2P Turn Manager
       objectReference: {fileID: 0}
-    - target: {fileID: 2197563101774428486, guid: b73ee40b05a23e244976684d69217a27, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 9070086723429105575, guid: b73ee40b05a23e244976684d69217a27, type: 3}
       propertyPath: m_RootOrder
       value: 5
@@ -925,6 +921,8 @@ MonoBehaviour:
     _keys: 0000000001000000
     _values: 0101
   online: 1
+  maxTurnTime: 10
+  maxPlayerTime: 3600
   playerInfos:
   - avatar: {fileID: 21300000, guid: 12e445f5a0a822a4d82b2c9151a83168, type: 3}
     name: "Nguy\u1EC5n Thanh T\xE2m"
