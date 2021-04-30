@@ -8,10 +8,6 @@ using UnityEngine;
 
 namespace BoardGames.Utils
 {
-	/// <summary>
-	/// Original source: <a href="https://gist.github.com/oktomus/7bdf92b3ccee221c3f19f6e9f75720c8"/> <para/>
-	/// <a href="https://improve.dk/minimizing-and-maximizing-windows/"/>
-	/// </summary>
 	internal static class WinStandalone
 	{
 		public static void Maximize()
@@ -19,9 +15,11 @@ namespace BoardGames.Utils
 #if UNITY_EDITOR || !UNITY_STANDALONE_WIN
 			return;
 #endif
-			var wf = new WindowFinder();
-			// Maxime all windows that contains "APP_NAME" in their title.
-			wf.FindWindows(0, null, new Regex(APP_NAME), new Regex(APP_NAME), new WindowFinder.FoundWindowCallback(MaximizeWindow));
+			Task.Run(() =>
+			{
+				var wf = new WindowFinder();
+				wf.FindWindows(0, null, new Regex(APP_NAME), new Regex(APP_NAME), new WindowFinder.FoundWindowCallback(MaximizeWindow));
+			});
 		}
 
 
@@ -36,18 +34,10 @@ namespace BoardGames.Utils
 		}
 
 
-		/// <summary>
-		/// The ShowWindowAsync method alters the windows show state through the nCmdShow parameter.<br/>
-		/// The nCmdShow parameter can have any of the SW values.<br/>
-		/// See <a href="http://msdn.microsoft.com/library/en-us/winui/winui/windowsuserinterface/windowing/windows/windowreference/windowfunctions/showwindowasync.asp"/> for full documentation.
-		///</summary>
 		[DllImport("user32.dll")]
 		private static extern bool ShowWindowAsync(int hWnd, int nCmdShow);
 
 
-		/// <summary>
-		/// An enumeration containing all the possible SW values.
-		/// </summary>
 		private enum SW : int
 		{
 			HIDE = 0,
@@ -66,19 +56,14 @@ namespace BoardGames.Utils
 
 		private static bool MaximizeWindow(int handle)
 		{
-			// Maximize the window.
 			ShowWindowAsync(handle, (int)SW.SHOWMAXIMIZED);
 			return true;
 		}
 
 
 
-		/// <summary>
-		/// A class used for finding windows based upon their class, title, process and parent window handle.
-		/// </summary>
 		private class WindowFinder
 		{
-			// Win32 constants.
 			const int WM_GETTEXT = 0x000D;
 			const int WM_GETTEXTLENGTH = 0x000E;
 
@@ -105,32 +90,17 @@ namespace BoardGames.Utils
 			private static extern Boolean EnumChildWindows(int hWndParent, PChildCallBack lpEnumFunc, int lParam);
 			#endregion
 
-			/// <summary>
-			/// The PChildCallBack delegate that we used with EnumWindows.
-			///</summary>
 			private delegate bool PChildCallBack(int hWnd, int lParam);
 
-			/// <summary>
-			/// This is an event that is run each time a window was found that matches the search criterias.<br/>
-			/// The boolean return value of the delegate matches the functionality of the PChildCallBack delegate function.
-			///</summary>
 			private event FoundWindowCallback foundWindow;
 			public delegate bool FoundWindowCallback(int hWnd);
 
-			// Members that'll hold the search criterias while searching.
 			private int parentHandle;
 			private Regex className;
 			private Regex windowText;
 			private Regex process;
 
 
-			/// <summary>
-			/// The main search function of the WindowFinder class. The parentHandle parameter is optional, taking in a zero if omitted.<br/>
-			/// The className can be null as well, in this case the class name will not be searched.<br/>
-			/// For the window text we can input a Regex object that will be matched to the window text, unless it's null.<br/>
-			/// The process parameter can be null as well, otherwise it'll match on the process name (Internet Explorer = "iexplore").<br/>
-			/// Finally we take the FoundWindowCallback function that'll be called each time a suitable window has been found.
-			///</summary>
 			public void FindWindows(int parentHandle, Regex className, Regex windowText, Regex process, FoundWindowCallback fwc)
 			{
 				this.parentHandle = parentHandle;
@@ -138,59 +108,43 @@ namespace BoardGames.Utils
 				this.windowText = windowText;
 				this.process = process;
 
-				// Add the FounWindowCallback to the foundWindow event.
 				foundWindow = fwc;
 
-				// Invoke the EnumChildWindows function.
 				EnumChildWindows(parentHandle, new PChildCallBack(EnumChildWindowsCallback), 0);
 			}
 
-
-			/// <summary>
-			/// This function gets called each time a window is found by the EnumChildWindows function.<br/> 
-			/// The found windows here are NOT the final found windows as the only filtering done by EnumChildWindows is on the parent window handle.
-			/// </summary>
 			private bool EnumChildWindowsCallback(int handle, int lParam)
 			{
-				// If a class name was provided, check to see if it matches the window.
 				if (className != null)
 				{
 					StringBuilder sbClass = new StringBuilder(256);
 					GetClassName(handle, sbClass, sbClass.Capacity);
 
-					// If it does not match, return true so we can continue on with the next window.
 					if (!className.IsMatch(sbClass.ToString()))
 						return true;
 				}
 
-				// If a window text was provided, check to see if it matches the window.
 				if (windowText != null)
 				{
 					int txtLength = SendMessage(handle, WM_GETTEXTLENGTH, 0, 0);
 					StringBuilder sbText = new StringBuilder(txtLength + 1);
 					SendMessage(handle, WM_GETTEXT, sbText.Capacity, sbText);
 
-					// If it does not match, return true so we can continue on with the next window.
 					if (!windowText.IsMatch(sbText.ToString()))
 						return true;
 				}
 
-				// If a process name was provided, check to see if it matches the window.
 				if (process != null)
 				{
 					int processID;
 					GetWindowThreadProcessId(handle, out processID);
 
-					// Now that we have the process ID, we can use the built in .NET function to obtain a process object.
 					System.Diagnostics.Process p = System.Diagnostics.Process.GetProcessById(processID);
 
-					// If it does not match, return true so we can continue on with the next window.
 					if (!process.IsMatch(p.ProcessName))
 						return true;
 				}
 
-				// If we get to this point, the window is a match. Now invoke the foundWindow event and based upon
-				// the return value, whether we should continue to search for windows.
 				return foundWindow(handle);
 			}
 		}

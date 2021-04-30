@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 using UnityEngine.SceneManagement;
 
 
@@ -54,21 +55,6 @@ namespace BoardGames
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static void ClearAllKeys() => dict.Clear();
 		#endregion
-
-
-		public static ReadOnlyArray<ReadOnlyArray<T>> ToReadOnly<T>(this T[][] array)
-		{
-			var rows = new ReadOnlyArray<T>[array.Length];
-			for (int x = 0; x < array.Length; ++x) rows[x] = new ReadOnlyArray<T>(array[x]);
-			return new ReadOnlyArray<ReadOnlyArray<T>>(rows);
-		}
-
-
-		public static IEnumerator<I> EnumValueGenerator<I>() where I : struct, Enum
-		{
-			var values = (I[])Enum.GetValues(typeof(I));
-			while (true) foreach (var value in values) yield return value;
-		}
 
 
 		#region Converts
@@ -233,7 +219,7 @@ namespace BoardGames
 		}
 
 
-		#region Load Scene
+		#region Scene
 		/// <summary>
 		/// <paramref name="relativePath"/> ví dụ: "A/B/C. Không cần "Assets" và ".unity"
 		/// </summary>
@@ -241,7 +227,8 @@ namespace BoardGames
 		{
 			await SceneManager.LoadSceneAsync(relativePath, additive ? LoadSceneMode.Additive : LoadSceneMode.Single);
 			await UniTask.Yield();
-			SceneManager.SetActiveScene(SceneManager.GetSceneByPath($"Assets/{relativePath}.unity"));
+			var scene = SceneManager.GetSceneByPath($"Assets/{relativePath}.unity");
+			if (scene.IsValid()) SceneManager.SetActiveScene(scene);
 		}
 
 
@@ -264,7 +251,8 @@ namespace BoardGames
 		{
 			await SceneManager.LoadSceneAsync(sceneBuildIndex, additive ? LoadSceneMode.Additive : LoadSceneMode.Single);
 			await UniTask.Yield();
-			SceneManager.SetActiveScene(SceneManager.GetSceneByBuildIndex(sceneBuildIndex));
+			var scene = SceneManager.GetSceneByBuildIndex(sceneBuildIndex);
+			if (scene.IsValid()) SceneManager.SetActiveScene(scene);
 		}
 
 
@@ -287,6 +275,7 @@ namespace BoardGames
 		#endregion
 
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool CurrentPlayerIsLocalHuman(this TurnManager t)
 			=> t is OfflineTurnManager ? (t as OfflineTurnManager).IsHumanPlayer(t.currentPlayerID)
 			: Table.current?.FindPlayer(t.currentPlayerID).user == User.local;
@@ -319,6 +308,28 @@ namespace BoardGames
 
 			return result;
 		}
+
+
+		#region Addressable asset
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static async UniTask<GameObject> Instantiate(this string assetAddress, Vector3 position, Quaternion rotation)
+			=> await Addressables.InstantiateAsync(assetAddress, position, rotation);
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static async UniTask<GameObject> Instantiate(this string assetAddress, Transform parent = null)
+			=> await Addressables.InstantiateAsync(assetAddress, parent);
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static async UniTask<T> Instantiate<T>(this string assetAddress, Vector3 position, Quaternion rotation) where T : Component
+			=> (await Addressables.InstantiateAsync(assetAddress, position, rotation)).GetComponent<T>();
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static async UniTask<T> Instantiate<T>(this string assetAddress, Transform parent = null) where T : Component
+			=> (await Addressables.InstantiateAsync(assetAddress, parent)).GetComponent<T>();
+		#endregion
 	}
 
 
@@ -456,7 +467,6 @@ namespace BoardGames
 		}
 
 
-		/// <param name="active">Active gameObject ngay lập tức ?</param>
 		public T Get(Vector3 position = default, bool active = true)
 		{
 			T item;

@@ -1,9 +1,9 @@
 ﻿using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -40,13 +40,13 @@ namespace BoardGames
 
 
 		public static OfflineChessBoardUI instance { get; private set; }
-		private void Awake()
+		private async void Awake()
 		{
 			instance = instance ? throw new Exception() : this;
-			buttonReplay.click += _ => SceneManager.LoadScene("Test");
-
-
-
+			await UniTask.DelayFrame(2);
+			var scene = SceneManager.GetActiveScene();
+			buttonBack.click += _ => scene.buildIndex.UnloadScene().Forget();
+			buttonReplay.click += _ => Util.ReloadActiveScene(true).Forget();
 		}
 
 
@@ -62,11 +62,11 @@ namespace BoardGames
 
 			async void SendRequest(Request request)
 			{
-				e.gameObject.SetActive(false);
+				e.enabled = false;
 				await t.SendRequest(request);
 				buttonUndo.interactable = t.CanUndo(t.currentPlayerID);
 				buttonRedo.interactable = t.CanRedo(t.currentPlayerID);
-				e.gameObject.SetActive(true);
+				e.enabled = true;
 			}
 		}
 
@@ -120,7 +120,7 @@ namespace BoardGames
 		public void OnGameOver()
 		{
 		}
-		
+
 
 		public void OnPlayerQuit(int playerID)
 		{

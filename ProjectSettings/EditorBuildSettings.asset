@@ -6,6 +6,22 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/TEST/Test.unity
-    guid: bf6a581203d245b4193b834fce6640ae
-  m_configObjects: {}
+    path: Assets/Scene/Main.unity
+    guid: 6248f599011a82c48a04403b6e02873f
+  - enabled: 1
+    path: Assets/Gomoku/Scene/Offline Board.unity
+    guid: 49436eee59621f64a94b960cad65a5fb
+  - enabled: 1
+    path: Assets/GOChess/Scene/Offline Board.unity
+    guid: 8d5db8da8f5096b4d8f540b9527b9aa0
+  - enabled: 1
+    path: Assets/KingChess/Scene/Offline Board.unity
+    guid: a626f68dd0405954d85fe4b0528beb34
+  - enabled: 1
+    path: Assets/ChineseChess/Scene/Offline Board.unity
+    guid: f45dffb13f87325489c62eb82a2dea22
+  - enabled: 1
+    path: Assets/TEST/Hehe.unity
+    guid: af4faf1273d040b4fbb142fba94d5d56
+  m_configObjects:
+    com.unity.addressableassets: {fileID: 11400000, guid: 8640cecc922a58549bc6e1faeecc49f7, type: 2}

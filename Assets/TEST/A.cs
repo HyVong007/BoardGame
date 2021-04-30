@@ -1,11 +1,15 @@
-﻿using UnityEngine;
+﻿using BoardGames;
+using Cysharp.Threading.Tasks;
+using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.InputSystem;
 
 
 public class A : MonoBehaviour
 {
-	private void Awake()
+	private async void Awake()
 	{
-		Destroy(this);
-		print(this != null);
+		var p = await "Popup".Instantiate();
+		print(p);
 	}
 }

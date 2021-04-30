@@ -5,6 +5,7 @@ using RotaryHeart.Lib.SerializableDictionary;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 
@@ -50,9 +51,6 @@ namespace BoardGames
 			public GameObject gameObject;
 
 
-			/// <summary>
-			/// Danh sách bàn chơi của 1 game
-			/// </summary>
 			[Serializable]
 			public sealed class GameTables
 			{
@@ -89,16 +87,10 @@ namespace BoardGames
 						User.Sex.Boy, User.Sex.Girl
 					});
 				}
-
-
-				[SerializeField] private ContextMenu contextMenu;
 			}
 			public SerializableDictionaryBase<MiniGame, GameTables> gameTables;
 
 
-			/// <summary>
-			/// Thanh công cụ chung cho tất cả game: Tìm kiếm bàn, chat trong phòng, chơi với máy...
-			/// </summary>
 			[Serializable]
 			public sealed class BottomPanel
 			{
@@ -117,11 +109,25 @@ namespace BoardGames
 		private static GameManager instance;
 		private void Awake()
 		{
-			instance = instance ? throw new Exception() : this;
-			DontDestroyOnLoad(this);
+			DontDestroyOnLoad(instance = instance ? throw new Exception() : this);
+			//DontDestroyOnLoad(Camera.main); // test
 			topPannel.Awake();
 			foreach (var game_button in gameButtons) game_button.Value.click += _ => SelectGame(game_button.Key);
 		}
+
+
+		private void Start()
+		{
+			var canvas = GetComponent<Canvas>();
+			SceneManager.sceneLoaded += (_, __) => canvas.enabled = false;
+			var main = SceneManager.GetActiveScene();
+			SceneManager.sceneUnloaded += _ => canvas.enabled = SceneManager.GetActiveScene() == main;
+		}
+
+
+
+
+
 
 
 		private async void SelectGame(MiniGame game)
@@ -129,21 +135,27 @@ namespace BoardGames
 			switch (game)
 			{
 				case MiniGame.Gomoku:
-					//if (await ChessConfig.Show("Cài đặt Ca Rô", "Gomoku/Prefab/Board Config", "O", "X", false))
-					//	await "Gomoku/Scene/Table Screen".LoadScene(true);
+					if (await Gomoku.OfflineConfig.ShowPopup())
+						await "Gomoku/Scene/Offline Board".LoadScene(true);
 					break;
 
 				case MiniGame.GOChess:
+					if (await GOChess.OfflineConfig.ShowPopup())
+						await "GOChess/Scene/Offline Board".LoadScene(true);
 					break;
 
 				case MiniGame.ChineseChess:
+					if (await ChineseChess.OfflineConfig.ShowPopup())
+						await "ChineseChess/Scene/Offline Board".LoadScene(true);
 					break;
 
 				case MiniGame.KingChess:
+					if (await KingChess.OfflineConfig.ShowPopup())
+						await "KingChess/Scene/Offline Board".LoadScene(true);
 					break;
 
 				case MiniGame.BattleShip:
-					throw new NotImplementedException();
+					print("battleship");
 					break;
 
 				default: throw new ArgumentOutOfRangeException();
@@ -179,5 +191,46 @@ namespace BoardGames
 			}
 			return tables;
 		}
+
+
+
+
+
+
+
+
+
+
+
+
+		// Đang có BUG: Nếu đóng bằng taskbaricon hoặc Alt+F4 thì có vấn đề không nhấn vô popup được.
+		#region Xác nhận khi người chơi muốn thoát
+		[SerializeField] private Popup confirmQuitPopup;
+
+#if !UNITY_EDITOR && UNITY_STANDALONE_WIN
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
+#endif
+		private static void δ()
+		{
+			Popup p = null;
+			Application.wantsToQuit += Confirm;
+
+
+			bool Confirm()
+			{
+				WinStandalone.Maximize();
+				if (!instance || p) return false;
+
+				p = Instantiate(instance.confirmQuitPopup);
+				p.ok += () =>
+				{
+					Application.wantsToQuit -= Confirm;
+					Application.Quit(); // Nên xử lý trước khi thoát !
+				};
+				p.gameObject.SetActive(true);
+				return false;
+			}
+		}
+		#endregion
 	}
 }

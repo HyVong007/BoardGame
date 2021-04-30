@@ -79,6 +79,21 @@ namespace BoardGames.KingChess
 		}
 
 
+		#region Test
+		private void OnEnable()
+		{
+			Camera.main.transform.position = new Vector3(4, 4, -10);
+		}
+
+
+		private void OnDisable()
+		{
+			Camera.main.transform.position = new Vector3(0, 0, -10);
+		}
+		#endregion
+
+
+
 		[SerializeField] private Transform cellFlag;
 		[SerializeField] private ObjectPool<Transform> hintPool;
 		private bool BeginDrag(Vector2 pixel)

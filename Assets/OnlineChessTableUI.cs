@@ -58,12 +58,12 @@ namespace BoardGames
 			var t = TurnManager.instance;
 			t.AddListener(this);
 
-			var @event = EventSystem.current;
+			var e = EventSystem.current;
 			buttonUndo.click += async _ =>
 			{
-				@event.gameObject.SetActive(false);
+				e.enabled = false;
 				buttonUndo.interactable = !await t.SendRequest(Request.UNDO) || t.CanUndo(t.currentPlayerID);
-				@event.gameObject.SetActive(true);
+				e.enabled = true;
 			};
 		}
 

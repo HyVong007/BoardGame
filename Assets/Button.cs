@@ -19,12 +19,14 @@ namespace BoardGames
 {
 	/// <summary>
 	/// Nhận các event: click, double click, long press, drag<br/>
-	/// Tùy chỉnh thông số với mỗi loại event
+	/// Tùy chỉnh thông số với mỗi loại event<para/>
+	/// Chú ý: Khi vừa gắn vô gameObject hoặc khi Reset thì sẽ cache <see cref="ScrollRect"/> và xử lý Drag
 	/// </summary>
 #if UNITY_EDITOR
 	[CanEditMultipleObjects]
 #endif
-	public sealed class Button : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
+	public sealed class Button : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,
+		IBeginDragHandler, IDragHandler, IEndDragHandler
 	{
 		#region Cài đặt thông số
 		[Flags]
@@ -381,6 +383,30 @@ namespace BoardGames
 
 		private bool show_interactable => @event != 0;
 #endif
+		#endregion
+
+
+		#region ScrollRect
+		[HideInInspector] [SerializeField] private ScrollRect scrollRect;
+		private void Reset() => scrollRect = GetComponentInParent<ScrollRect>();
+
+
+		public void OnBeginDrag(PointerEventData eventData)
+		{
+			if (scrollRect) scrollRect.OnBeginDrag(eventData);
+		}
+
+
+		public void OnDrag(PointerEventData eventData)
+		{
+			if (scrollRect) scrollRect.OnDrag(eventData);
+		}
+
+
+		public void OnEndDrag(PointerEventData eventData)
+		{
+			if (scrollRect) scrollRect.OnEndDrag(eventData);
+		}
 		#endregion
 	}
 }
